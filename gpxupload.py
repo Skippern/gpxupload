@@ -551,51 +551,86 @@ def get_countries(minlat, minlon, maxlat, maxlon):
         minlon, maxlon = swap(minlon, maxlon)
     api = overpass.API(timeout=600)
 #    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});'.format(minlat,minlon,maxlat,maxlon)
-    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out meta;'.format(minlat,minlon,maxlat,maxlon)
-#    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});(._;>;);out body;'.format(minlat,minlon,maxlat,maxlon)
+#    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out meta;'.format(minlat,minlon,maxlat,maxlon)
+#    searchString = 'relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out meta;'.format(minlat,minlon,maxlat,maxlon)
+#    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});(._;>;);out meta;'.format(minlat,minlon,maxlat,maxlon)
+#    unicode(searchString)
+#    searchString = overpass.MapQuery(minlat, minlon, maxlat, maxlon)
+    searchString = 'relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out ids;'.format(minlat,minlon,maxlat,maxlon)
     try:
         logger.debug(searchString)
+        print searchString
         #        print api.Get(searchString)
         result = api.Get(searchString)
-#        print result
-    except:
-        logger.error("No search result returned")
+        print result
+    except overpass.errors.OverpassSyntaxError as e:
+        logger.critical("OverpassSyntaxError caught in get_countries: %s", e)
+        print "OverpassSyntaxError caught"
         return False
     try:
-        json.loads(result)
-    except ValueError:
-        logger.error("No Valid JSON Loaded")
+        json.loads('{0}'.format(result))
+    except TypeError:
+        logger.error("json.TypeError in get_countries")
         return False
+    except ValueError:
+        logger.error("No Valid JSON Loaded (json.ValueError in get_countries)")
+        return False
+    try:
+        json.loads('{0}'.format(result))['elements']
+    except:
+        logger.critical("json in get_countries does not contain ['elements']: %s", result)
+        sys.exit(1)
     return result
 
 def get_relation(id):
 #    searchString = '[out:json];relation({0});(._;>;);'.format(str(id))
-    searchString = '[out:json];relation({0});(._;>;);out meta;'.format(str(id))
+#    searchString = '[out:json];relation({0});(._;>;);out meta;'.format(str(id))
+    searchString = 'relation({0});(._;>;);'.format(str(id))
     logger.debug(searchString)
-    #  print searchString
+    print searchString
     api = overpass.API(timeout=600)
     try:
         result = api.Get(searchString)
-    except:
+    except overpass.errors.OverpassSyntaxError as e:
+        logger.critical("OverpassSyntaxError caught in get_relation: %s", e)
         return False
+#    except:
+#        logger.error("Exception caught")
+#        return False
+    print result
     return result
 
 def get_relations(id, admin_level):
     # 3600000000
     id = id + 3600000000
 #    searchString = '[out:json];relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];'.format(str(id), str(admin_level))
-    searchString = '[out:json];relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];out meta;'.format(str(id), str(admin_level))
+#    searchString = '[out:json];relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];out meta;'.format(str(id), str(admin_level))
+    searchString = 'relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];out ids;'.format(str(id), str(admin_level))
     logger.debug(searchString)
-    #print searchString
+    print searchString
     api = overpass.API(timeout=600)
     try:
         result = api.Get(searchString)
     except overpass.OverpassSyntaxError:
+        logger.critical("OverpassSyntaxError caught in get_relations")
         return False
     except overpass.TimeoutError:
+        logger.error("overpass gave TimeoutError in get_relations")
         return False
+    try:
+        json.loads('{0}'.format(result))
+    except TypeError:
+        logger.error("json.TypeError in get_countries")
+    except ValueError:
+        logger.error("No Valid JSON Loaded (json.ValueError in get_relations)")
+        return False
+    try:
+        json.loads('{0}'.format(result))['elements']
     except:
-        return False
+        logger.critical("json in get_relations does not contain ['elements']: %s", result)
+        sys.exit(1)
+#    except:
+#        return False
     return result
 
 def upload_gpx(gpxFile, uTags, uDescription):
@@ -1045,6 +1080,7 @@ for i in bbox:
                     toTest.append(sub['ref'])
             toTest.append(check['id'])
     polygons.append(testOB)
+#toTest.append(59470)
 if track.within(Point( ([ 0.0, 0.0 ]) ).buffer(meter2deg(1.0))):
     tags.append(u"0.0")
 toTest.sort()
