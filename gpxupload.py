@@ -24,6 +24,11 @@ logger = logging.getLogger("gpxupload")
 logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
 #logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
 #logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
+#overpassServer = "http://overpass-api.de/api/interpreter" # Default
+#overpassServer = "http://overpass.osm.rambler.ru/cgi/interpreter"
+#overpassServer = "http://api.openstreetmap.fr/oapi/interpreter"
+overpassServer = "http://overpass.osm.ch/api/interpreter"
+
 
 #if speedups.available:
 if False:
@@ -46,7 +51,6 @@ niTest = []
 tiTest = []
 bbox = []
 polygons = []
-result = ""
 testOB = Point( ([ 0.0, 0.0 ]) ).buffer(0.00001)
 sPoints = []
 SQKM = ( (60.0 * 1.852) * (60.0 * 1.852) )
@@ -480,7 +484,7 @@ def test_relation(id):
     return name
 
 def mk_kml(ob, id, name, subdir="0"):
-    #    return
+    return
     logger.debug("Creating KML")
     try:
         ns = '{http://www.opengis.net/kml/2.2}'
@@ -508,7 +512,7 @@ def mk_kml(ob, id, name, subdir="0"):
         fil.close()
         logger.info("KML Saved in %s", filename)
     except:
-        logger.error("Failed to create KML")
+        logger.error("Failed to create KML: %s", filename)
         return
         try:
             logger.debug("Creating SVG")
@@ -538,77 +542,76 @@ def swap(a, b):
 def get_countries(minlat, minlon, maxlat, maxlon):
     result = ""
     if minlat == maxlat:
-        logger.critical("ERROR: Latitude %s equal %s - TERMINATING", str(minlat), str(maxlat))
-        sys.exit(1)
+        logger.critical("ERROR: Latitude %s equal %s - EXPANDING", str(minlat), str(maxlat))
+        minlat = minlat - 0.0000001
+        maxlat = maxlat + 0.0000001
     if minlon == maxlon:
-        logger.critical("ERROR: Longitude %s equal %s - TERMINATING", str(minlon), str(maxlon))
-        sys.exit(1)
+        logger.critical("ERROR: Longitude %s equal %s - EXPANDING", str(minlon), str(maxlon))
+        minlon = minlon - 0.0000001
+        maxlon = maxlon + 0.0000001
     if minlat > maxlat:
         logger.error("ERROR: Latitude %s greater than %s - SWAPPING", str(minlat), str(maxlat))
         minlat, maxlat = swap(minlat, maxlat)
     if minlon > maxlon:
         logger.error("ERROR: Longitude %s greater than %s - SWAPPING", str(minlon), str(maxlon))
         minlon, maxlon = swap(minlon, maxlon)
-    api = overpass.API(timeout=600)
-#    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});'.format(minlat,minlon,maxlat,maxlon)
-#    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out meta;'.format(minlat,minlon,maxlat,maxlon)
-#    searchString = 'relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out meta;'.format(minlat,minlon,maxlat,maxlon)
-#    searchString = '[out:json];relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});(._;>;);out meta;'.format(minlat,minlon,maxlat,maxlon)
-#    unicode(searchString)
-#    searchString = overpass.MapQuery(minlat, minlon, maxlat, maxlon)
-    searchString = 'relation["type"="boundary"]["admin_level"="2"]["boundary"="administrative"]({0},{1},{2},{3});out ids;'.format(minlat,minlon,maxlat,maxlon)
+    api = overpass.API(timeout=600, endpoint=overpassServer)
+    searchString = 'is_in;relation["type"="boundary"]["boundary"="administrative"]({0},{1},{2},{3});out ids;'.format(minlat,minlon,maxlat,maxlon)
     try:
         logger.debug(searchString)
-        print searchString
-        #        print api.Get(searchString)
-        result = api.Get(searchString)
-        print result
+        result = api.Get(searchString, responseformat="json")
     except overpass.errors.OverpassSyntaxError as e:
         logger.critical("OverpassSyntaxError caught in get_countries: %s", e)
-        print "OverpassSyntaxError caught"
+        return False
+    except overpass.errors.ServerRuntimeError as e:
+        logger.critical("ServerRuntimeError from Overpass in get_countries: %s", e)
+        return False
+    except overpass.errors.UnknownOverpassError as e:
+        logger.critical("UnknownOverpassError caught in get_countries: %s", e)
         return False
     try:
-        json.loads('{0}'.format(result))
+        json.loads(json.dumps(result))
+#        json.loads(result)
     except TypeError:
         logger.error("json.TypeError in get_countries")
+        sys.exit(1)
         return False
     except ValueError:
-        logger.error("No Valid JSON Loaded (json.ValueError in get_countries)")
+        logger.error("No Valid JSON Loaded (json.ValueError in get_countries): %s", result)
+        sys.exit(1)
         return False
     try:
-        json.loads('{0}'.format(result))['elements']
+        myElements = json.loads(json.dumps(result))['elements']
     except:
-        logger.critical("json in get_countries does not contain ['elements']: %s", result)
+        logger.error("json in get_countries does not contain ['elements']: %s", result)
         sys.exit(1)
+    print myElements
+    if len(myElements) < 1:
+        logger.error("json in get_countries contains empty ['elements']! %s", result)
+        sys.exit(1)
+    logger.debug("get_countries passed all tests")
     return result
 
 def get_relation(id):
 #    searchString = '[out:json];relation({0});(._;>;);'.format(str(id))
 #    searchString = '[out:json];relation({0});(._;>;);out meta;'.format(str(id))
-    searchString = 'relation({0});(._;>;);'.format(str(id))
+#    searchString = 'relation({0});(._;>;);'.format(str(id))
+    searchString = 'relation({0});>>;'.format(str(id))
     logger.debug(searchString)
-    print searchString
-    api = overpass.API(timeout=600)
+    api = overpass.API(timeout=600, responseformat="json", endpoint=overpassServer)
     try:
         result = api.Get(searchString)
     except overpass.errors.OverpassSyntaxError as e:
         logger.critical("OverpassSyntaxError caught in get_relation: %s", e)
         return False
-#    except:
-#        logger.error("Exception caught")
-#        return False
-    print result
     return result
 
 def get_relations(id, admin_level):
     # 3600000000
     id = id + 3600000000
-#    searchString = '[out:json];relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];'.format(str(id), str(admin_level))
-#    searchString = '[out:json];relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];out meta;'.format(str(id), str(admin_level))
     searchString = 'relation(area:{0})["type"="boundary"]["admin_level"="{1}"]["boundary"="administrative"];out ids;'.format(str(id), str(admin_level))
     logger.debug(searchString)
-    print searchString
-    api = overpass.API(timeout=600)
+    api = overpass.API(timeout=600, responseformat="json", endpoint=overpassServer)
     try:
         result = api.Get(searchString)
     except overpass.OverpassSyntaxError:
@@ -629,8 +632,6 @@ def get_relations(id, admin_level):
     except:
         logger.critical("json in get_relations does not contain ['elements']: %s", result)
         sys.exit(1)
-#    except:
-#        return False
     return result
 
 def upload_gpx(gpxFile, uTags, uDescription):
@@ -650,8 +651,6 @@ def upload_gpx(gpxFile, uTags, uDescription):
         sys.exit(99)
     payload = { u"description": uDescription, u"tags": uTags.encode('utf-8').replace(".", "_"), u"visibility": u"trackable" }
     payload = json.loads(json.dumps(payload))
-#    print payload
-#    print type(uTags), type(uDescription), type(payload)
     try:
         url = "http://www.openstreetmap.org/api/0.6/gpx/create"
         files = {u'file': open(gpxFile, 'rb') }
@@ -661,7 +660,6 @@ def upload_gpx(gpxFile, uTags, uDescription):
         raise
     if r.status_code == 200:
         print "Uploaded with success"
-        #        print r.text
         logger.info("%s Upload completed with success", gpxFile)
         sys.exit(0)
         return
@@ -687,8 +685,6 @@ except IOError:
     logger.critical("Could not find file: %s\n\n", file)
     sys.exit(1)
 
-#upload_gpx(file, "um, does palavras, três palavras etiquete", "test upload")
-
 tree = etree.parse(gpx_file)
 root = tree.getroot()
 
@@ -699,8 +695,8 @@ track = []
 for trk in root.findall('{http://www.topografix.com/GPX/1/1}trk'):
     for seg in trk.findall('{http://www.topografix.com/GPX/1/1}trkseg'):
         for point in seg.findall('{http://www.topografix.com/GPX/1/1}trkpt'):
-            lats.append(point.get('lat'))
-            lons.append(point.get('lon'))
+            lats.append(float(point.get('lat')))
+            lons.append(float(point.get('lon')))
             trkpt = ([ float(point.get('lon')), float(point.get('lat')) ])
             track.append(trkpt)
 trackptLength = len(track)
@@ -722,364 +718,21 @@ elif trackLength > 100.0:
 logger.debug("GPX File contains %s trackpoints with %s km.", str(len(lats)), str(trackLength))
 toTest = []
 
-####
-#box.append( [ minlat, minlon, maxlat, maxlon ] ) ##
-bbox.append( [ -34.0, -51.0, 5.0, -28.0 ] ) # Brazil
-bbox.append( [ -9.0, -69.0, 0.0, -28.0 ] ) # Brazil
-bbox.append( [ -34.0, -53.0, 2.0, -51.0 ] ) # Brazil
-bbox.append( [ 2.0, -53.0, 6.0, -51.0 ] ) # Brazil/France
-bbox.append( [ 23.0, 123.0, 34.0, 132.0 ] ) # Japan
-bbox.append( [ 39.0, 124.0, 43.0, 132.0 ] ) # North Korea
-bbox.append( [ 54.0, 77.0, 79.0, 108.0 ] ) # Russia
-bbox.append( [ -60.0, 153.0, -49.0, 180.0 ] ) # New Zealand/Antarctica
-bbox.append( [ 4.0, 116.0, 21.0, 129.0 ] ) # Philipines
-bbox.append( [ 45.0, 135.0, 54.0, 180.0 ] ) # Russia
-bbox.append( [ 32.0, 34.0, 34.0, 35.0 ] ) # Israel
-bbox.append( [ -23.0, -80.0, -12.0, -68.0 ] ) # Chile, Peru
-bbox.append( [ 6.0, -77.0, 14.0, -74.0 ] ) # Columbia
-bbox.append( [ 18.0, -90.0, 24.0, -86.0 ] ) # Belize, Mexico
-bbox.append( [ 0.0, -66.0, 6.0, -59.0 ] ) # Brazil, Guyana, Venezuela
-bbox.append( [ -43.0, -63.0, -28.0, -59.0 ] ) # Argentina
-bbox.append( [ -4.0, -71.0, 3.0, -69.0 ] ) # Brazil, Columbia
-bbox.append( [ 2.0, -84.0, 6.0, -70.0 ] ) # Columbia
-bbox.append( [ 6.0, -62.0, 10.0, -59.0 ] ) # Guyana, Venezuela
-bbox.append( [ 11.0, -69.0, 13.0, -64.0 ] ) # Curação
-bbox.append( [ -28.0, -73.0, -23.0, -63.0 ] ) # Argentina, Chile
-bbox.append( [ 27.0, -120.0, 30.0, -106 ] ) # Mexico
-bbox.append( [ 24.0, -120.0, 27.0, -100.0 ] ) # Mexico
-bbox.append( [ 15.0, -88.0, 19.0, -79.0 ] ) # Honduras
-bbox.append( [ 17.0, -68.0, 20.0, -64.0 ] ) # Puerto Rico
-bbox.append( [ 20.0, 87.0, 26.0, 93.0 ] ) # Bangladesh
-bbox.append( [ 21.0, 119.0, 26.0, 123.0 ] ) # Taiwan
-bbox.append( [ 32.0, 35.0, 35.0, 37.0 ] ) # Israel, Libanon
-bbox.append( [ 10.0, 102.0, 15.0, 108.0 ] ) # Cambodia
-bbox.append( [ -45.0, 109.0, -9.0, 163.0 ] ) # Australia
-bbox.append( [ 34.0, 124.0, 39.0, 132.0 ] ) # South Korea
-bbox.append( [ 56.0, 164.0, 84.0, 180.0 ] ) # Russia
-bbox.append( [ -6.0, -82.0, 2.0, -74.0 ] ) # Equador, Columbia, Peru
-bbox.append( [ 27.0, -99.0, 30.0, -84.0 ] ) # USA
-bbox.append( [ 30.0, -120, 33.0, -104.0 ] ) # USA, Mexico
-bbox.append( [ -40.0, -59.0, -35.0, -53.0 ] ) # Argentina
-bbox.append( [ -4.0, -74.0, 2.0, -71.0 ] ) # Peru, Columbia
-bbox.append( [ 0.0, -69.0, 3.0, -66.0 ] ) # Brazil, Columbia, Venezuela
-bbox.append( [ -23.0, -68.0, -19.0, -63.0 ] ) # Bolivia, Chile, Argentila
-bbox.append( [ 17.0, -76.0, 19.0, -73.0 ] ) # Haiti
-bbox.append( [ -51.0, -78.0, -28.0, -71.0 ] ) # Chile, Argentina
-bbox.append( [ 17.0, -73.0, 24.0, -68.0 ] ) # Haiti, Dominican Republic
-bbox.append( [ 12.0, -71.0, 13.0, -69.0 ] ) # Aruba
-bbox.append( [ 10.0, -88.0, 15.0, -80.0 ] ) # Nicaragua
-bbox.append( [ 27.0, -106.0, 30.0, -99.0 ] ) # USA, Mexico
-bbox.append( [ 24.0, -100.0, 27.0, -96.0 ] ) # USA, Mexico
-bbox.append( [ 13.0, -93.0, 18.0, -88.0 ] ) # Guatamala
-bbox.append( [ 56.0, -9.0, 60.0, -5.0 ] ) # Scotland
-bbox.append( [ 79.0, 35.0, 82.0, 108.0 ] ) # Franz Joseph Land
-bbox.append( [ 54.0, 13.0, 55.0, 15.0 ] ) # Germany, Poland
-bbox.append( [ 44.0, 9.0, 47.0, 14.0 ] ) # Italy, Switzerland, Austria, Slovenia, Croatia
-bbox.append( [ 43.0, 8.0, 44.0, 12.0 ] ) # Italy
-bbox.append( [ 42.0, 10.0, 43.0, 13.0 ] ) # Italy
-bbox.append( [ 30.0, -8.0, 36.0, -6.0 ] ) # Marocco
-bbox.append( [ -28.0, 19.0, -17.0, 30.0 ] ) # Botswana
-bbox.append( [ -32.0, 30.0, -28.0, 33.0 ] ) # South Africa
-bbox.append( [ -1.0, 71.0, 12.0, 75.0 ] ) # Maldives
-bbox.append( [ 5.0, 79.0, 11.0, 83.0 ] ) # Sri Lanka
-bbox.append( [ 38.0, 39.0, 44.0, 51.0 ] ) # Caucasus
-bbox.append( [ 34.0, 32.0, 36.0, 35.0 ] ) # Cyprus
-bbox.append( [ 28.0, 46.0, 31.0, 49.0 ] ) # Kuwait
-bbox.append( [ 24.0, 50.0, 27.0, 52.0 ] ) # Qatar, Bahrain
-bbox.append( [ 13.0, 36.0, 19.0, 43.0 ] ) # Eritrea
-bbox.append( [ 41.0, 13.0, 44.0, 17.0 ] ) # Italy
-bbox.append( [ 49.0, 7.0, 51.0, 12.0 ] ) # Germany
-bbox.append( [ 54.0, 108.0, 82.0, 164.0 ] ) # Russia
-bbox.append( [ 26.0, 79.0, 31.0, 88.0 ] ) # Nepal
-bbox.append( [ 27.0, -13.0, 36.0, -8.0 ] ) # Marocco
-bbox.append( [ 44.0, 5.0, 49.0, 9.0 ] ) # France, Italy, Switzerland, Germany
-bbox.append( [ 0.0, -55.0, 7.0, -53.0 ] ) # Brazil, French Guiana, Suriname
-bbox.append( [ -19.0, -68.0, -9.0, -53.0 ] ) # Brazil, Bolivia
-bbox.append( [ -34.0, -59.0, -30.0, -53.0 ] ) # Uruguay
-bbox.append( [ -35.0, -58.0, -34.0, -53.0 ] ) # Uruguay
-bbox.append( [ -35.0, -59.0, -34.0, -58.0 ] ) # Buenos Aires AR
-bbox.append( [ -35.0, -58.0, -34.0, -57.0 ] ) # Argentina/Uruguay
-bbox.append( [ -35.0, -57.0, -34.0, -53.0 ] ) # Montevideo
-bbox.append( [ -57.0, -69.0, -51.0, -63.0 ] ) # Tierra del Fuego AR
-bbox.append( [ -54.0, -63.0, -50.0, -57.0 ] ) # Falklands
-bbox.append( [ -57.0, -76.0, -52.0, -57.0 ] ) # Tierra del Fuego CL
-bbox.append( [ 14.0, -26.0, 18.0, -22.0 ] ) # Cap Verde
-bbox.append( [ 27.0, -19.0, 31.0, -13.0 ] ) # Canaries
-bbox.append( [ 36.0, -10.0, 41.0, -8.0 ] ) # Portugal
-bbox.append( [ 36.0, -8.0, 41.0, -6.0 ] ) # Portugal, Spain
-bbox.append( [ 41.0, -10.0, 43.0, -6.0 ] ) # Portugal, Spain
-bbox.append( [ 37.0, -6.0, 42.0, 2.0 ] ) # Spain
-bbox.append( [ 43.0, -10.0, 44.0, -6.0 ] ) # Spain
-bbox.append( [ 38.0, 2.0, 42.0, 5.0 ] ) # Spain
-bbox.append( [ 42.0, 2.0, 43.0, 4.0 ] ) # Spain, France
-bbox.append( [ 42.0, -6.0, 44.0, 1.0 ] ) # Spain, France
-bbox.append( [ 42.0, 1.0, 44.0, 7.0 ] ) # France
-bbox.append( [ 36.0, -5.0, 37.0, -1.0 ] ) # Spain
-bbox.append( [ 35.0, -4.0, 36.0, -2.0 ] ) # Spain, Marocco
-bbox.append( [ 35.0, 14.0, 37.0, 15.0 ] ) # Malta
-bbox.append( [ 63.0, 20.0, 68.0, 26.0 ] ) # Finland, Sweden
-bbox.append( [ 49.0, 5.0, 51.0, 7.0 ] ) # Luxembourg
-bbox.append( [ 58.0, 3.0, 66.0, 11.0 ] ) # Norway
-bbox.append( [ 57.0, 6.0, 58.0, 8.0, ] ) # Norway
-bbox.append( [ 57.0, 8.0, 58.0, 11.0 ] ) # Denmark
-bbox.append( [ 56.0, 6.0, 57.0, 11.0 ] ) # Denmark
-bbox.append( [ 56.0, 11.0, 59.0, 12.0 ] ) # Denmark, Sweeden, Norway
-bbox.append( [ 55.0, 12.0, 57.0, 13.0 ] ) # Denmark, Sweden
-bbox.append( [ 59.0, 11.0, 68.0, 12.0 ] ) # Norway, Sweden
-bbox.append( [ 56.0, 14.0, 57.0, 19.0 ] ) # Sweden
-bbox.append( [ 57.0, 12.0, 73.0, 20.0 ] ) # Norway, Sweden
-bbox.append( [ 68.0, 20.0, 73.0, 28.0 ] ) # Norway, Sweden, Finland
-bbox.append( [ 68.0, 28.0, 73.0, 32.0 ] ) # Norway, Russia
-bbox.append( [ 55.0, 13.0, 57.0, 14.0 ] ) # Sweden
-bbox.append( [ 54.0, 14.0, 56.0, 16.0 ] ) # Bornholm
-bbox.append( [ 54.0, 6.0, 56.0, 12.0 ] ) # Denmark, Germany
-bbox.append( [ 54.0, 12.0, 55.0, 13.0 ] ) # Denmark, Germany
-bbox.append( [ 51.0, 3.0, 54.0, 8.0 ] ) # Netherland, Belgium, Germany
-bbox.append( [ 51.0, 2.0, 52.0, 3.0 ] ) # Belgium
-bbox.append( [ 49.0, 2.0, 51.0, 5.0 ] ) # Belgium, France
-bbox.append( [ 51.0, 1.0, 52.0, 2.0 ] ) # Dover Straight
-bbox.append( [ 35.0, -5.0, 36.0, -4.0 ] ) # Marocco
-bbox.append( [ -16.0, 10.0, -7.0, 16.0 ] ) # Angola
-bbox.append( [ -16.0, 10.0, -9.0, 21.0 ] ) # Angola
-bbox.append( [ -7.0, 10.0, -4.0, 14.0 ] ) # Angola, Cabinda, Congo, Congo DR
-bbox.append( [ 0.0, 9.0, 3.0, 12.0 ] ) # Equatorial Guinea
-bbox.append( [ -90.0, -91.0, -60.0, -44.0 ] ) # Antarctica - Graham Land
-bbox.append( [ -90.0, -180.0, -60.0, -91.0 ] ) # Antarctica
-bbox.append( [ -90.0, -44.0, -61.0, 180.0 ] ) # Antarctica
-bbox.append( [ -9.0, -15.0, -7.0, -14.0] ) # Ascension
-bbox.append( [ -17.0, -6.0, -15.0, -5.0 ] ) # St. Helena
-bbox.append( [ -38.0, -13.0, -37.0, -12.0 ] ) # Trista da Cunha
-bbox.append( [ -41.0, -11.0, -40.0, -9.0 ] ) # Gough Island
-bbox.append( [ -55.0, 2.0, -54.0, 4.0 ] ) # Bouvet Island
-bbox.append( [ -61.0, -44.0, -52.0, -23.0 ] ) # South Georgia & South Sandwich Islands
-bbox.append( [ 35.0, -32.0, 41.0, -23.0 ] ) # Azores
-bbox.append( [ 32.0, -18.0, 34.0, -15.0 ] ) # Madeira
-bbox.append( [ 63.0, -26.0, 68.0, -12.0 ] ) # Iceland
-bbox.append( [ 70.0, -11.0, 72.0, -7.0 ] ) # Jan Mayen
-bbox.append( [ 74.0, 18.0, 75.0, 20.0 ] ) # Bjørnøya
-bbox.append( [ 76.0, 9.0, 81.0, 35.0 ] ) # Svalbard
-bbox.append( [ 57.0, -14.0, 58.0, -13.0 ] ) # Rockall
-bbox.append( [ 61.0, -8.0, 63.0, -6.0 ] ) # Føroyar
-bbox.append( [ 32.0, -65.0, 33.0, -64.0 ] ) # Bermuda
-bbox.append( [ 24.0, -79.0, 28.0, -73.0 ] ) # Bahamas
-bbox.append( [ 24.0, -80.0, 28.0, -79.0 ] ) # Bahamas, USA
-bbox.append( [ 24.0, -81.0, 25.0, -80.0 ] ) # Bahamas, USA
-bbox.append( [ 24.0, -84.0, 30.0, -81.0 ] ) # USA
-bbox.append( [ 33.0, -126.0, 41.0, -69.0 ] ) # USA
-bbox.append( [ 51.0, -168.0, 86.0, -142.0 ] ) # USA
-bbox.append( [ 41.0, -126.0, 48.0, -94.0 ] ) # USA
-bbox.append( [ 18.0, -179.0, 26.0, -152.0 ] ) # USA
-bbox.append( [ -52.0, -78.0, -51.0, -69.0 ] ) # Chile, Argentina
-bbox.append( [ -30.0, -59.0, -28.0, -53.0 ] ) # Brazil, Argentina
-bbox.append( [ 50.0, -180.0, 56.0, -168.0 ] ) # Aleutian Islands
-bbox.append( [ 50.0, 164.0, 56.0, 180.0 ] ) # Aleutian Islands
-bbox.append( [ 56.0, -180.0, 86.0, -171.0 ] ) # Russia
-bbox.append( [ 41.0, -94.0, 50.0, -66.0 ] ) # USA, Canada
-bbox.append( [ 48.0, -129.0, 50.0, -94.0 ] ) # USA, Canada
-bbox.append( [ 58.0, -142.0, 86.0, -140.0 ] ) # USA, Canada
-bbox.append( [ 41.0, -66.0, 50.0, -50.0 ] ) # Canada
-bbox.append( [ 19.0, -86.0, 24.0, -73.0 ] ) # Cuba
-bbox.append( [ 17.0, -79.0, 19.0, -76.0 ] ) # Jamaica
-bbox.append( [ 55.0, -171.0, 84.0, -168.0 ] ) # Bering Streight
-bbox.append( [ 50.0, -140.0, 63.0, -52.0 ] ) # Canada
-bbox.append( [ 63.0, -140.0, 86.0, -76.0 ] ) # Canada
-bbox.append( [ 59.0, -76.0, 86.0, -26.0 ] ) # Greenland
-bbox.append( [ 68.0, -26.0, 86.0, -11.0 ] ) # Greenland
-bbox.append( [ 35.0, -6.0, 37.0, -5.0 ] ) # Gibraltar
-bbox.append( [ -31.0, 26.0, -28.0, 30.0 ] ) # Lesoto
-bbox.append( [ -28.0, 30.0, -25.0, 33.0 ] ) # Swaziland
-bbox.append( [ -28.0, -63.0, -19.0, -53.0 ] ) # Paraguay
-bbox.append( [ 25.0, -81.0, 30.0, -80.0 ] ) # USA
-bbox.append( [ -34.0, -82.0, -33.0, -78.0 ] ) # Easter Island?
-bbox.append( [ -28.0, -110.0, -27.0, -109.0 ] ) # Easter Island
-bbox.append( [ -26.0, -132.0, -23.0, -124.0 ] ) # Pitcairn
-bbox.append( [ 41.0, 12.0, 42.0, 13.0 ] ) # Vatican, Italy
-bbox.append( [ 43.0, 12.0, 44.0, 13.0 ] ) # San Marino, Italy
-bbox.append( [ 43.0, 7.0, 44.0, 8.0 ] ) # Monaco, France
-bbox.append( [ 42.0, 1.0, 43.0, 2.0 ] ) # Andorra, Spain, France
-bbox.append( [ 47.0, 9.0, 48.0, 10.0 ] ) # Lichtenstein, Austria, Switzerland
-bbox.append( [ 1.0, 103.0, 2.0, 105.0 ] ) # Singapore, Indonesia, Malaysia
-bbox.append( [ 10.0, 41.0, 13.0, 44.0 ] ) # Djibouti
-bbox.append( [ -2.0, 5.0, -1.0, 6.0 ] ) # Annobon
-bbox.append( [ -1.0, 6.0, 1.0, 7.0 ] ) # Sao Tome
-bbox.append( [ 1.0, 7.0, 2.0, 8.0 ] ) # Principe
-bbox.append( [ 3.0, 8.0, 4.0, 9.0 ] ) # Bioko
-bbox.append( [ 3.0, 114.0, 6.0, 116.0 ] ) # Brunei
-bbox.append( [ 22.0, 113.0, 23.0, 115.0 ] ) # Hong Kong, Macau
-bbox.append( [ 26.0, 88.0, 29.0, 93.0 ] ) # Buthan
-bbox.append( [ -21.0, 57.0, -19.0, 58.0 ] ) # Mauritiuz
-bbox.append( [ -22.0, 55.0, -20.0, 57.0 ] ) # Reunion
-bbox.append( [ -20.0, 63.0, -19.0, 64.0 ] ) # Rodrigues
-bbox.append( [ -13.0, 96.0, -11.0, 97.0 ] ) # Keeling
-bbox.append( [ -11.0, 105.0, -10.0, 106.0 ] ) # Christmas Island
-bbox.append( [ -9.0, 69.0, -4.0, 75.0 ] ) # British Indian Ocean Territory
-bbox.append( [ -51.0, 68.0, -48.0, 71.0 ] ) # French Southern Antarctic Lands
-bbox.append( [ -54.0, 72.0, -52.0, 74.0 ] ) # Heard & McDonald Islands
-bbox.append( [ -38.0, 77.0, -37.0, 78.0 ] ) # Ile Amsterdam
-bbox.append( [ -1.0, 72.0, 9.0, 72.0 ] ) # Maldives
-bbox.append( [ -17.0, 59.0, -16.0, 60.0 ] ) # Coco Island
-bbox.append( [ 51.0, -11.0, 56.0, -5.0 ] ) # Ireland, Northern Ireland, Wales
-bbox.append( [ 49.0, -7.0, 51.0, 2.0 ] ) # England, France
-bbox.append( [ 51.0, -6.0, 52.0, 1.0 ] ) # England
-bbox.append( [ 52.0, -5.0, 61.0, 3.0 ] ) # England, Scotland, Wales, Orkeney
-bbox.append( [ 44.0, -7.0, 49.0, 5.0 ] ) # France
-bbox.append( [ 38.0, 7.0, 43.0, 10.0 ] ) # Corsica, Sardinia
-bbox.append( [ 0.0, -59.0, 9.0, -55.0 ] ) # French Guiana, Suriname, Brazil, Guyana
-bbox.append( [ -51.0, -71.0, -28.0, -63.0 ] ) # Argentina
-bbox.append( [ -12.0, -74.0, -4.0, -68.0 ] ) # Brazil, Bolivia, Peru
-bbox.append( [ 6.0, -84.0, 10.0, -77.0 ] ) # Panama, Columbia, Costa Rica
-bbox.append( [ 30.0, -104.0, 33.0, -78.0 ] ) # USA
-bbox.append( [ -49.0, 163.0, -32.0, 180.0 ] ) # New Zealand
-bbox.append( [ -2.0, -94.0, 6.0, -84.0 ] ) # Galapagos
-bbox.append( [ 27.0, 32.0, 32.0, 35.0 ] ) # Sinai
-bbox.append( [ 63.0, 26.0, 68.0, 32.0 ] ) # Russia, Finland
-bbox.append( [ 48.0, 9.0, 49.0, 14.0 ] ) # Germany, Austria, Czech
-bbox.append( [ 37.0, 10.0, 41.0, 19.0 ] ) # Italy
-bbox.append( [ 35.0, 35.0, 38.0, 43.0 ] ) # Turkey, Syria, Iraq
-bbox.append( [ 5.0, 75.0, 12.0, 79.0 ] ) # India
-bbox.append( [ -12.0, 49.0, -3.0, 61.0 ] ) # Seyshelles
-bbox.append( [ -32.0, 163.0, -25.0, 180.0 ] ) # Norfolk Island
-bbox.append( [ -46.0, -180.0, -40.0, -170.0 ] ) # Catham Island
-bbox.append( [ 41.0, 132.0, 45.0, 138.0 ] ) # Russia
-bbox.append( [ 2.0, 100.0, 7.0, 105.0 ] ) # Malaysia
-bbox.append( [ 30.0, 72.0, 38.0, 81.0 ] ) # Kashmir
-bbox.append( [ -9.0, 140.0, 1.0, 163.0 ] ) # Papua New Guinea
-bbox.append( [ 18.0, -93.0, 24.0, -90.0 ] ) # Mexico
-bbox.append( [ 41.0, 87.0, 54.0, 120.0 ] ) # Mongolia
-bbox.append( [ 45.0, 132.0, 54.0, 135.0 ] ) # China, Russia
-bbox.append( [ 30.0, 132.0, 41.0, 138.0 ] ) # Japan
-bbox.append( [ -9.0, 116.0, 4.0, 140.0 ] ) # Indonesia
-bbox.append( [ 11.0, 79.0, 26.0, 87.0 ] ) # India
-bbox.append( [ -27.0, 42.0, -12.0, 55.0 ] ) # Madagaskar
-bbox.append( [ -31.0, 14.0, -28.0, 26.0 ] ) # South Africa
-bbox.append( [ -17.0, 10.0, -16.0, 21.0 ] ) # Angola
-bbox.append( [ 13.0, -120, 24.0, -93.0 ] ) # Mexico
-bbox.append( [ -12.0, -82.0, -6.0, -74.0 ] ) # Peru
-bbox.append( [ 3.0, -70.0, 6.0, -66.0 ] ) # Colombia, Venezuela
-bbox.append( [ -50.0, 30.0, -40.0, 60.0 ] ) # Indian Ocean Territory
-bbox.append( [ 0.0, 41.0, 10.0, 58.0 ] ) # Somalia, Etiopia
-bbox.append( [ 30.0, 7.0, 37.0, 14.0 ] ) # Tunisia
-bbox.append( [ -5.0, 28.0, -1.0, 31.0 ] ) # Burundi, Rwanda
-bbox.append( [ 43.0, 120.0, 54.0, 132.0 ] ) # China, Russia
-bbox.append( [ 30.0, 138.0, 45.0, 155.0 ] ) # Japan
-bbox.append( [ -25.0, 163.0, -6.0, 174.0 ] ) # Vanuatu
-bbox.append( [ 6.0, -74.0, 12.0, -69.0 ] ) # Colombia, Venezuela
-bbox.append( [ 41.0, 10.0, 42.0, 12.0 ] ) # Italia
-bbox.append( [ 38.0, 19.0, 43.0, 22.0 ] ) # Albania
-bbox.append( [ 13.0, 43.0, 19.0, 53.0 ] ) # Yemen
-bbox.append( [ 12.0, 68.0, 30.0, 79.0 ] ) # India
-bbox.append( [ 59.0, 20.0, 63.0, 32.0 ] ) # Finland, Estonia
-bbox.append( [ 51.0, 8.0, 54.0, 16.0 ] ) # Germany, Polan
-bbox.append( [ 6.0, -69.0, 11.0, -62.0 ] ) # Venezuela
-bbox.append( [ -37.0, 15.0, -31.0, 30.0 ] ) # South Africa
-bbox.append( [ -28.0, 10.0, -17.0, 19.0 ] ) # Namibia
-bbox.append( [ 10.0, 44.0, 13.0, 57.0 ] ) # Gulf of Aden
-bbox.append( [ 34.0, 120.0, 43.0, 124.0 ] ) # China
-bbox.append( [ -9.0, 103.0, 1.0, 116.0 ] ) # Indonesia
-bbox.append( [ 6.0, -88.0, 10.0, -84.0 ] ) # Costa Rica
-bbox.append( [ 10.0, -62.0, 12.0, -60.0 ] ) # Trinidad & Tobago
-bbox.append( [ 12.0, -74.0, 14.0, -71.0 ] ) # Colombia
-bbox.append( [ 37.0, 7.0, 38.0, 10.0 ] ) # Tunisia
-bbox.append( [ 22.0, 52.0, 27.0, 57.0 ] ) # UAE
-bbox.append( [ 29.0, 35.0, 32.0, 36.0 ] ) # Israel, Palestina, Jordan
-bbox.append( [ 47.0, 10.0, 48.0, 14.0 ] ) # Austria
-bbox.append( [ 57.0, 20.0, 59.0, 32.0 ] ) # Estonia
-bbox.append( [ -12.0, 42.0, 0.0, 49.0 ] ) # Indian Ocean
-bbox.append( [ 31.0, 81.0, 41.0, 123.0 ] ) # China
-bbox.append( [ -9.0, 94.0, 2.0, 103.0 ] ) # Indonesia
-bbox.append( [ 7.0, 102.0, 10.0, 116.0 ] ) # Vietnam
-bbox.append( [ 56.0, 32.0, 79.0, 77.0 ] ) # Russia
-bbox.append( [ 11.0, -64.0, 13.0, -62.0 ] ) # Caribbean
-bbox.append( [ 19.0, 52.0, 22.0, 63.0 ] ) # Oman
-bbox.append( [ 41.0, 17.0, 44.0, 19.0 ] ) # Montenegro, Bosnia
-bbox.append( [ 2.0, 92.0, 7.0, 100.0 ] ) # Indonesia
-bbox.append( [ 32.0, 37.0, 35.0, 42.0 ] ) # Syria
-bbox.append( [ 36.0, 26.0, 38.0, 35.0 ] ) # Turkey
-bbox.append( [ -25.0, 174.0, -14.0, 180.0 ] ) # Fiji
-bbox.append( [ 4.0, 129.0, 13.0, 140.0 ] ) # Palau
-bbox.append( [ 29.0, 88.0, 31.0, 123.0 ] ) # China
-bbox.append( [ 1.0, 105.0, 3.0, 116.0 ] ) # Indonesia, Malaysia
-bbox.append( [ 30.0, 60.0, 38.0, 72.0 ] ) # Afganistan
-bbox.append( [ 18.0, 2.0, 38.0, 7.0 ] ) # Algeria
-bbox.append( [ 30.0, -6.0, 35.0, -2.0 ] ) # Morocco
-bbox.append( [ 12.0, -62.0, 20.0, -58.0 ] ) # Caribbean
-bbox.append( [ 24.0, 36.0, 28.0, 50.0 ] ) # Saudi-Arabia
-bbox.append( [ 24.0, 35.0, 29.0, 36.0 ] ) # Saudi-Arabia
-bbox.append( [ 36.0, 19.0, 38.0, 26.0 ] ) # Greece
-bbox.append( [ 13.0, 53.0, 19.0, 60.0 ] ) # Oman
-bbox.append( [ 22.0, 61.0, 30.0, 68.0 ] ) # Pakistan
-bbox.append( [ 3.0, 105.0, 7.0, 114.0 ] ) # Malaysia
-bbox.append( [ 16.0, -64.0, 20.0, -62.0 ] ) # Caribbean
-bbox.append( [ 10.0, -18.0, 17.0, -11.0 ] ) # Senegal, Gambia, Guinea-Bissau
-bbox.append( [ 7.0, 91.0, 15.0, 96.0 ] ) # Andaman
-bbox.append( [ 7.0, 140.0, 30.0, 150.0 ] ) # Mariana Islands
-bbox.append( [ 49.0, 12.0, 51.0, 19.0 ] ) # Czech
-bbox.append( [ 56.0, 19.0, 57.0, 32.0 ] ) # Latvia
-bbox.append( [ 19.0, 38.0, 24.0, 52.0 ] ) # Saudi-Arabia
-bbox.append( [ 3.0, 9.0, 7.0, 12.0 ] ) # Cameroon
-bbox.append( [ 10.0, 108.0, 18.0, 116.0 ] ) # Vietnam
-bbox.append( [ 26.0, 99.0, 29.0, 123.0 ] ) # China
-bbox.append( [ 22.0, 57.0, 24.0, 61.0 ] ) # Oman
-bbox.append( [ -1.0, 30.0, 5.0, 35.0 ] ) # Uganda
-bbox.append( [ 34.0, 19.0, 36.0, 32.0 ] ) # Greece
-bbox.append( [ 54.0, 16.0, 56.0, 27.0 ] ) # Lituania, Kaliningrad
-bbox.append( [ 44.0, 14.0, 49.0, 19.0 ] ) # Croatia
-bbox.append( [ 28.0, 36.0, 32.0, 39.0 ] ) # Jordan
-bbox.append( [ 19.0, 35.0, 24.0, 38.0 ] ) # Egypt, Sudan
-bbox.append( [ 18.0, -1.0, 37.0, 2.0 ] ) # Algeria
-bbox.append( [ -4.0, 7.0, 0.0, 14.0 ] ) # Gabon
-bbox.append( [ -27.0, 33.0, -25.0, 42.0 ] ) # Mosambique
-bbox.append( [ 30.0, -2.0, 36.0, -1.0 ] ) # Algeria
-bbox.append( [ 6.0, -15.0, 10.0, -10.0 ] ) # Sierra Leone
-bbox.append( [ -5.0, 35.0, 0.0, 42.0 ] ) # Kenya
-bbox.append( [ 38.0, 22.0, 42.0, 27.0 ] ) # Greece
-bbox.append( [ 51.0, 16.0, 54.0, 27.0 ] ) # Poland
-bbox.append( [ 28.0, 39.0, 32.0, 46.0 ] ) # Saudi-Arabia, Iraq
-bbox.append( [ 38.0, 27.0, 42.0, 39.0 ] ) # Turkey
-bbox.append( [ 24.0, 57.0, 30.0, 61.0 ] ) # Iran
-bbox.append( [ 34.0, 15.0, 37.0, 19.0 ] ) # Italia
-bbox.append( [ -5.0, 31.0, -1.0, 35.0 ] ) # Tanzania
-bbox.append( [ 7.0, 96.0, 15.0, 102.0 ] ) # Thailand
-bbox.append( [ 21.0, 115.0, 26.0, 119.0 ] ) # China
-bbox.append( [ 6.0, 114.0, 7.0, 116.0 ] ) # det var en holme der...
-bbox.append( [ 1.0, 150.0, 30.0, 180.0 ] ) # Marshall Islands, Micronesia
-bbox.append( [ 43.0, 19.0, 47.0, 22.0 ] ) # Serbia
-bbox.append( [ 0.0, 35.0, 5.0, 41.0 ] ) # Kenya
-bbox.append( [ -7.0, 14.0, -1.0, 28.0 ] ) # DR Congo Kinshasa (Zaire)
-bbox.append( [ 15.0, 91.0, 20.0, 99.0 ] ) # Myanmar (Burma)
-bbox.append( [ 18.0, 108.0, 22.0, 115.0 ] ) # China
-bbox.append( [ 23.0, 99.0, 26.0, 115.0 ] ) # China
-bbox.append( [ 1.0, 140.0, 7.0, 150.0 ] ) # det var en holme der...
-bbox.append( [ -6.0, 163.0, 1.0, 180.0 ] ) # Nauru
-bbox.append( [ 0.0, -180.0, 18.0, -150.0 ] ) # Kiribati
-bbox.append( [ -2.0, -120.0, 13.0, -94.0 ] ) # Clipperton Island
-bbox.append( [ 21.0, -19.0, 27.0, 8.0 ] ) # Western Sahara
-bbox.append( [ 18.0, 7.0, 30.0, 14.0 ] ) # Algeria, Libya, Niger
-bbox.append( [ 27.0, 50.0, 28.0, 57.0 ] ) # Iran
-bbox.append( [ -25.0, 34.0, -17.0, 42.0 ] ) # Mosambique
-#bbox.append( [ -89.0, -179.9, 89.0, 179.9 ] )
-mk_kml(cascaded_union(polygons), 0, u"bbox")
-for i in bbox:
-    sPoints = []
-    sPoints.append( ([ i[1], i[0] ]) )
-    sPoints.append( ([ i[3], i[0] ]) )
-    sPoints.append( ([ i[3], i[2] ]) )
-    sPoints.append( ([ i[1], i[2] ]) )
-    testOB = Polygon(sPoints)
-    minlon, minlat, maxlon, maxlat = testOB.bounds
-    if track.within(testOB) or track.intersects(testOB):
-        result = False
-        while result == False:
-            result = get_countries(minlat,minlon,maxlat,maxlon)
-            if result == False:
-                time.sleep(30)
-        myElements = json.loads(result)['elements']
-        for check in myElements:
-            for sub in check['members']:
-                if sub['role'] == 'subarea' and sub['type'] == 'relation':
-                    toTest.append(sub['ref'])
-            toTest.append(check['id'])
-    polygons.append(testOB)
+gpxBbox = [ lats[0], lons[0], lats[len(lats) - 1], lons[len(lons) - 1] ]
+result = False
+while result == False:
+    result = get_countries(gpxBbox[0], gpxBbox[1], gpxBbox[2], gpxBbox[3])
+    if result == False:
+        time.sleep(30)
+
+myElements = json.loads(result)['elements']
+for check in myElements:
+    if check['tags']['admin_level'] == '2':
+        for sub in check['members']:
+            if sub['role'] == 'subarea' and sub['type'] == 'relation':
+                toTest.append(sub['ref'])
+        toTest.append(check['id'])
+
 #toTest.append(59470)
 if track.within(Point( ([ 0.0, 0.0 ]) ).buffer(meter2deg(1.0))):
     tags.append(u"0.0")
@@ -1093,12 +746,10 @@ logger.info("Relations to test: %s", toTest)
 while len(toTest) > 0:
     executeTest = toTest[0]
     toTest.remove(executeTest)
-    #    print executeTest, toTest
     country = False
     country = test_relation(executeTest)
     if country == False:
         logger.info("Country %s (%s) is FALSE",executeTest, name)
-        #        print "Country {0} ({1}) is FALSE".format(executeTest, name)
         continue
     logger.debug("Executing subdivision for %s", country)
     if country == "Russia":
