@@ -29,6 +29,7 @@ logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG,
 #overpassServer = "http://api.openstreetmap.fr/oapi/interpreter"
 overpassServer = "http://overpass.osm.ch/api/interpreter"
 
+dummyResult = {u'elements': [ { u'type': u'relation', u'id': 59470, u'tags': { u'admin_level': '2', u'name': u'Brasil' } }, { u'type': u'relation', u'id': 1059668, u'tags': { u'admin_level': '2', u'name': u'Norge' } }, { u'type': u'relation', u'id': 2978650, u'tags': { u'admin_level': '2', u'name': u'Norway' } }, { u'type': u'relation', u'id': 295480, u'tags': { u'admin_level': '2', u'name': u'Portugal' } } ], u'version': 0.6, u'osm3s': {u'timestamp_osm_base': u'29554', u'timestamp_areas_base': u'29532', u'copyright': u'The data included in this document is from www.openstreetmap.org. The data is made available under ODbL.'}, u'generator': u'Overpass API'}
 
 #if speedups.available:
 if False:
@@ -580,12 +581,13 @@ def get_countries(minlat, minlon, maxlat, maxlon):
         logger.error("No Valid JSON Loaded (json.ValueError in get_countries): %s", result)
         sys.exit(1)
         return False
+    result = dummyResult
     try:
         myElements = json.loads(json.dumps(result))['elements']
     except:
         logger.error("json in get_countries does not contain ['elements']: %s", result)
         sys.exit(1)
-    print myElements
+#    print myElements
     if len(myElements) < 1:
         logger.error("json in get_countries contains empty ['elements']! %s", result)
         sys.exit(1)
@@ -725,12 +727,13 @@ while result == False:
     if result == False:
         time.sleep(30)
 
-myElements = json.loads(result)['elements']
+myElements = json.loads(json.dumps(result))['elements']
 for check in myElements:
     if check['tags']['admin_level'] == '2':
-        for sub in check['members']:
-            if sub['role'] == 'subarea' and sub['type'] == 'relation':
-                toTest.append(sub['ref'])
+#    if True:
+#        for sub in check['members']:
+#            if sub['role'] == 'subarea' and sub['type'] == 'relation':
+#                toTest.append(sub['ref'])
         toTest.append(check['id'])
 
 #toTest.append(59470)
