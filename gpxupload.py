@@ -26,7 +26,7 @@ overpassServer = "http://overpass-api.de/api/interpreter" # Default
 #overpassServer = "http://overpass.osm.rambler.ru/cgi/interpreter"
 #overpassServer = "http://api.openstreetmap.fr/oapi/interpreter"
 #overpassServer = "http://overpass.osm.ch/api/interpreter"
-api = overpass.API(timeout=600, endpoint=overpassServer)
+api = overpass.API(timeout=900, endpoint=overpassServer)
 
 #if speedups.available:
 if False:
@@ -65,6 +65,7 @@ def mk_kml(ob, id, name, subdir="0"):
         return
     logger.debug("Creating KML")
     filename = u"./kml/000_Default.kml"
+    name = clean(name)
     try:
         ns = '{http://www.opengis.net/kml/2.2}'
         sls = styles.LineStyle(color="ffff0000")
@@ -255,13 +256,68 @@ def build_object(id,al, name=u"Default"):
         sPoints = []
         try:
             for i in way['geometry']:
-                if way['type'] != 'way':
-                    continue
+#                if way['type'] != 'way':
+#                    continue
                 sPoints.append( [ i['lon'], i['lat'] ] )
         except:
-            pass
+            logger.error("Failed to read 'geometry' for way!")
+            # Let us try to download the way manually and create it from there.
+            newResult = False
+            wID = way['ref']
+            while newResult == False:
+                newResult = get_data('way({0});out geom;'.format(wID))
+#            print newResult
+            newElements = json.loads(json.dumps(newResult))['elements']
+#            print newElements
+            newGeometry = []
+#            newGeometry = json.loads(json.dumps(newElements))['geometry']
+            try:
+                #newGeometry = json.loads(newElements)['geometry']
+                newGeometry = json.loads(json.dumps(newElements))['geometry']
+            except:
+                try:
+                    #newGeometry = json.loads(json.dumps(newElements))['geometry']
+                    newGeometry = json.loads(newElements)['geometry']
+                except:
+                    logger.error("Failed to get geometry")
+            if newGeometry != []:
+                print newGeometry
+            for p in newGeometry:
+                sPoints.append( [ p['lon'], p['lat'] ] )
+            if len(sPoints) == 0:
+                # We still havn't made it, now lets try the LONG way
+                logger.debug("Still no way, now, try to download as complete objects")
+                newResult = False
+                while newResult == False:
+                    newResult = get_data('way({0});(._;>;);out body;'.format(wID))
+                newElements = json.loads(json.dumps(newResult))['elements']
+#                print newElements
+                testNodes = []
+                testWays = []
+                no_double_testing_please = set()
+                for i in newElements:
+                    if i['type'] == "node":
+                        testNodes.append(i)
+                    elif i['type'] == "way":
+                        testWays.append(i)
+#                print "We now have {0} ways and {1} nodes".format(len(testWays), len(testNodes))
+                for way in testWays:
+                    wID = way['id']
+                    if wID not in no_double_testing_please:
+                        no_double_testing_please.add(wID)
+                    else:
+                        continue
+#                    print "Running with wID {0}".format(wID)
+                    for node in way['nodes']:
+                        for i in testNodes:
+                            if node == i['id']:
+                                sPoints.append( ([ float(i['lon']), float(i['lat']) ]) )
+#                print "We now have {0} ways and {1} nodes - making way with {2} positions".format(len(testWays), len(testNodes), len(sPoints))
         if len(sPoints) > 1:
             myWays.append(LineString(sPoints))
+        else:
+            logger.error("Way have only %s position tuples", len(sPoints))
+#            print way
 #    print len(myWays)
     lines = []
     rings = []
@@ -277,21 +333,67 @@ def build_object(id,al, name=u"Default"):
     for l in lines:
         if isinstance(l, MultiLineString):
             myWays.extend(l)
+            lines.remove(l)
         else:
             myWays.append(l)
+            lines.remove(l)
 #    print len(myWays)
     try:
         mergedLine = linemerge(myWays)
     except:
-        mergedLine = myWays[0]
+        try:
+            mergedLine = myWays[0]
+        except:
+            try:
+                mergedLine = myWays
+            except:
+                pass
     if mergedLine.is_ring:
         rings.append(mergedLine)
     else:
         lines.append(mergedLine)
+    for l in lines:
+        try:
+            polygons.append(Polygon(l).buffer(meter2deg(1.0)))
+            lines.remove(l)
+        except:
+            try:
+                polygons.append(LineString(l).buffer(meter2deg(1.0)))
+                lines.remove(l)
+            except:
+                try:
+                    polygons.append(MultiLineString(l).buffer(meter2deg(1.0)))
+                    lines.remove(l)
+                except:
+                    pass
+    logger.debug("We have %s rings", len(rings))
     for r in rings:
         polygons.append(Polygon(r).buffer(meter2deg(1.0)))
     for i in myWays:
         polygons.append( cascaded_union(i).buffer(meter2deg(1.0)) )
+    logger.debug("Start polygonize %s lines", len(lines))
+    while len(lines) > 0:
+        l = lines[0]
+#        try:
+#            polygons.append( cascaded_union(l).buffer(meter2deg(1.0)) )
+#            lines.remove(l)
+#        except:
+#            pass
+        try:
+            polygons.append(l.buffer(meter2deg(1.0)))
+            lines.remove(l)
+        except:
+            pass
+#    for err in lines:
+#        print err
+    logger.debug("Completed polygonizing lines")
+    try:
+        polygons.append(linemerge(lines).buffer(meter2deg(1.0)))
+    except:
+        pass
+    logger.debug("We have created %s polygons", len(polygons))
+    if (len(lines)) > 0:
+        logger.warning("We still have %s lines that will not be handled more after this point", len(lines))
     logger.debug("Start creating MultiPolygon of chunks")
     shape = cascaded_union(polygons).buffer(meter2deg(1.0))
     try:
@@ -310,30 +412,29 @@ def build_object(id,al, name=u"Default"):
 #    print myWays
 #    print shape.area, shape.geom_type, shape.is_valid
 #    print shape
-    logger.debug("Completed creating {0} of collected chunks", str(shape.geom_type))
+    try:
+        logger.debug("Completed creating %s of collected chunks", str(shape.geom_type))
+    except:
+        logger.debug("Completed creating (MultiPolygon) of collected chunks")
     mk_kml(shape, id, name, al)
     return shape
 
 def test_objects(id, al=3, name=u"Default"):
     logger.debug("Preparing to test the results for %s", id)
     myID = id + 3600000000
-#    if len(get_data('is_in;relation({4})({0},{1},{2},{3});out ids'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID))['elements']) > 0:
-#    if len(get_data('rel(area:{4});is_in;node({0},{1},{2},{3});out ids'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID))['elements']) > 0:
     result = False
     while result == False:
-        result = get_data('rel(area:{4}) ->.a;.a is_in;node({0},{1},{2},{3});out ids qt 1;'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID))
-                          
+        result = get_data('rel(area:{4}) ->.a;.a is_in;node({0},{1},{2},{3});out ids qt 1;'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID), True)
     if len(result['elements']) > 0:
         testOB = build_object(id,al,name)
         if track.within(testOB) or track.intersects(testOB):
-            logger.debug("We have a positive result in {0}".format(id))
+            logger.debug(u"We have a positive result in %s: %s", id, clean(name) )
             result = get_data('relation({0});out tags;'.format(myID))
-#            logger.debug("I should probably check for town names here")
             return True
     logger.debug("Rejecting {0}!!!".format(id))
     return False
 
-def get_data(searchString):
+def get_data(searchString, returnDummy = False):
     try:
         logger.debug(searchString)
         result = api.Get(searchString, responseformat="json")
@@ -351,6 +452,13 @@ def get_data(searchString):
         return False
     except overpass.errors.MultipleRequestsError as e:
         logger.error("MultipleRequestsError caught in get_data, waiting for 30 seconds: %s", e)
+        time.sleep(30)
+        return False
+    except overpass.errors.ServerLoadError as e:
+        if returnDummy:
+            logger.errors("ServerLoadError caught in get_data, returning dummyJSON: %s", e)
+            return json.loads('{"version": 0.6, "generator": "dummy", "elements": [{"type": "dummy"}, {"type": "dummy"}] }')
+        logger.error("ServerLoadError caught in get_data, waiting for 30 seconds: %s", e)
         time.sleep(30)
         return False
     except requests.exceptions.ConnectionError as e:
@@ -480,7 +588,10 @@ if len(myElements) == 0:
     bbox.append( [10.0, 32.0, 40.0, 65.0, "Arabia" ] ) # Arabia
     bbox.append( [-11.0, 53.0, 84.0, 91.0, "Central Asia" ] ) # Central Asia
     bbox.append( [32.0, 26.0, 84.0, 53.0, "East Europe" ] ) # East Europe
-    bbox.append( [35.0, -35.0, 84.0, 26.0, "West Europe" ] ) # West Europe
+#    bbox.append( [35.0, -35.0, 84.0, 26.0, "West Europe" ] ) # West Europe
+    bbox.append( [35.0, -35.0, 84.0, 0.0, "West Europe (West)" ] )
+    bbox.append( [35.0, 0.0, 59.0, 26.0, "West Europe (South)" ] )
+    bbox.append( [59.0, 0.0, 84.0, 26.0, "West Europe (North)" ] )
     bbox.append( [-56.0, -28.0, 38.0, 64.0, "Africa" ] ) # Africa
     bbox.append( [25.0, -180.0, 84.0, -18.0, "North America" ] ) # North America
     bbox.append( [3.0, -123.0, 33.0, -56.0, "Central America" ] ) # Central America
@@ -535,10 +646,11 @@ for country in myElements:
     name = clean(name)
 #    logger.info("Testing GPX in %s (%s)", name, cID)
 
+    logger.debug("Preparing to test %s (%s)", name, cID)
     if isinstance(name, int):
         logger.debug("Doesn't seem like {0} has a name!".format(name))
 #    elif name == "Argentina":
-#        # 6, 7
+#        # 4 Privince, 5 Departamento, 6 Distrito, 7 Municipio
 #        if test_objects(cID, 2):
 #            result = get_data_relation(cID, 6)
 #            for state in json.loads(json.dumps(result))['elements']:
@@ -552,24 +664,86 @@ for country in myElements:
         # 4 state, 8 municipality
         if test_objects(cID, 2, name):
             get_tags(country)
-            result = get_data_relation(cID, 4)
+            result = False
+            while result == False:
+                result = get_data_relation(cID, 4)
             for state in json.loads(json.dumps(result))['elements']:
                 sID = state['id']
                 if sID not in done:
                     done.add(sID)
                 else:
                     continue
-                if test_objects(sID, 4, state['tags']['name']):
+                if test_objects(sID, 4, clean(state['tags']['name'])):
                     get_tags(state)
-                    result = get_data_relation(sID, 8)
+                    result = False
+                    while result == False:
+                        result = get_data_relation(sID, 8)
                     for municipality in json.loads(json.dumps(result))['elements']:
                         mID = municipality['id']
                         if mID not in done:
                             done.add(mID)
                         else:
                             continue
-                        if test_objects(mID, 8, municipality['tags']['name']):
+                        if test_objects(mID, 8, clean(municipality['tags']['name'])):
                             get_tags(municipality)
+#    elif name == "Chile"
+        # 4 Region, 6 Province, 8 Comunas
+    elif name == "Norway":
+        if test_objects(cID, 2, name):
+            get_tags(country)
+            result = False
+            while result == False:
+                result = get_data_relation(cID, 4)
+            for fylke in json.loads(json.dumps(result))['elements']:
+                fID = fylke['id']
+                if fID not in done:
+                    done.add(fID)
+                else:
+                    continue
+                if test_objects(fID, 4, clean(fylke['tags']['name'])):
+                    get_tags(fylke)
+                    result = False
+                    while result == False:
+                        result = get_data_relation(rID, 7)
+                    for kommune in json.loads(json.dumps(result))['elements']:
+                        kID = kommune['id']
+                        if kID not in done:
+                            done.add(kID)
+                        else:
+                            continue
+                        if test_objects(kID, 7, clean(kommune['tags']['name'])):
+                                get_tags(kommune)
+#    elif name == "Norway"
+        # 4 Fylke, 7 Kommune
+#    elif name == "Portugal"
+        # 4 Region, 7 Municipio
+    elif name == "Portugal":
+        if test_objects(cID, 2, name):
+            get_tags(country)
+            result = False
+            while result == False:
+                result = get_data_relation(cID, 4)
+            for region in json.loads(json.dumps(result))['elements']:
+                rID = region['id']
+                if rID not in done:
+                    done.add(rID)
+                else:
+                    continue
+                if test_objects(rID, 4, clean(region['tags']['name'])):
+                    get_tags(region)
+                    result = False
+                    while result == False:
+                        result = get_data_relation(rID, 7)
+                    for municipality in json.loads(json.dumps(result))['elements']:
+                        mID = municipality['id']
+                        if mID not in done:
+                            done.add(mID)
+                        else:
+                            continue
+                        if test_objects(mID, 7, clean(municipality['tags']['name'])):
+                            get_tags(municipality)
+#    elif name == "Uguguay"
+        # 4 Department, 6 Municipio
     else:
         logger.debug("No rules defined for %s (%s)", name, cID)
 
