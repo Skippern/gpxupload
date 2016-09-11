@@ -65,7 +65,7 @@ def mk_kml(ob, id, name, subdir="0"):
         return
     logger.debug("Creating KML")
     filename = u"./kml/000_Default.kml"
-    name = clean(name)
+    name = clean(name).encode('ascii', 'ignore')
     try:
         ns = '{http://www.opengis.net/kml/2.2}'
         sls = styles.LineStyle(color="ffff0000")
@@ -76,7 +76,7 @@ def mk_kml(ob, id, name, subdir="0"):
         if ob.geom_type == "LineString" or ob.geom_type == "MultiLineString" or ob.geom_type == "LinearRing":
             d = kml.Document(ns, str(id), "Traces", 'GPX Visualization')
         elif ob.geom_type == "Polygon" or ob.geom_type == "MultiPolygon":
-            d = kml.Document(ns, str(id), '{0}'.format(unidecode(name)), 'Border visualization')
+            d = kml.Document(ns, str(id), '{0}'.format(name), 'Border visualization')
         else:
             d = kml.Document(ns, str(id), "Points", 'Point visualization')
         kf.append(d)
@@ -280,8 +280,8 @@ def build_object(id,al, name=u"Default"):
                     newGeometry = json.loads(newElements)['geometry']
                 except:
                     logger.error("Failed to get geometry")
-            if newGeometry != []:
-                print newGeometry
+#            if newGeometry != []:
+#                print newGeometry
             for p in newGeometry:
                 sPoints.append( [ p['lon'], p['lat'] ] )
             if len(sPoints) == 0:
@@ -303,10 +303,10 @@ def build_object(id,al, name=u"Default"):
 #                print "We now have {0} ways and {1} nodes".format(len(testWays), len(testNodes))
                 for way in testWays:
                     wID = way['id']
-                    if wID not in no_double_testing_please:
-                        no_double_testing_please.add(wID)
-                    else:
-                        continue
+#                    if wID not in no_double_testing_please:
+#                        no_double_testing_please.add(wID)
+#                    else:
+#                        continue
 #                    print "Running with wID {0}".format(wID)
                     for node in way['nodes']:
                         for i in testNodes:
@@ -315,6 +315,7 @@ def build_object(id,al, name=u"Default"):
 #                print "We now have {0} ways and {1} nodes - making way with {2} positions".format(len(testWays), len(testNodes), len(sPoints))
         if len(sPoints) > 1:
             myWays.append(LineString(sPoints))
+            logger.debug("Way created with %s position tuples", len(sPoints))
         else:
             logger.error("Way have only %s position tuples", len(sPoints))
 #            print way
@@ -348,10 +349,17 @@ def build_object(id,al, name=u"Default"):
                 mergedLine = myWays
             except:
                 pass
-    if mergedLine.is_ring:
-        rings.append(mergedLine)
-    else:
-        lines.append(mergedLine)
+    try:
+        if mergedLine.is_ring:
+            rings.append(mergedLine)
+        else:
+            lines.append(mergedLine)
+    except:
+        for i in mergedLine:
+            if i.is_ring:
+                rings.append(i)
+            else:
+                lines.append(i)
     for l in lines:
         try:
             polygons.append(Polygon(l).buffer(meter2deg(1.0)))
@@ -370,7 +378,10 @@ def build_object(id,al, name=u"Default"):
     for r in rings:
         polygons.append(Polygon(r).buffer(meter2deg(1.0)))
     for i in myWays:
-        polygons.append( cascaded_union(i).buffer(meter2deg(1.0)) )
+        try:
+            polygons.append( unary_union(i).buffer(meter2deg(1.0)) )
+        except:
+            polygons.append( cascaded_union(i).buffer(meter2deg(1.0)) )
     logger.debug("Start polygonize %s lines", len(lines))
     while len(lines) > 0:
         l = lines[0]
@@ -395,7 +406,10 @@ def build_object(id,al, name=u"Default"):
     if (len(lines)) > 0:
         logger.warning("We still have %s lines that will not be handled more after this point", len(lines))
     logger.debug("Start creating MultiPolygon of chunks")
-    shape = cascaded_union(polygons).buffer(meter2deg(1.0))
+    try:
+        shape = unary_union(polygons).buffer(meter2deg(1.0))
+    except:
+        shape = cascaded_union(polygons).buffer(meter2deg(1.0))
     try:
         polygons.append(MultiPolygon(shape.interiors.buffer(meter2deg(1.0))))
     except:
@@ -404,7 +418,10 @@ def build_object(id,al, name=u"Default"):
         polygons.append(MultiPolygon(shape.exterior.buffer(meter2deg(1.0))))
     except:
         pass
-    shape = cascaded_union(polygons).buffer(meter2deg(1.0))
+    try:
+        shape = unary_union(polygons).buffer(meter2deg(1.0))
+    except:
+        shape = cascaded_union(polygons).buffer(meter2deg(1.0))
     try:
         shape = MultiPolygon(shape.exterior).buffer(meter2deg(1.0))
     except:
@@ -421,6 +438,9 @@ def build_object(id,al, name=u"Default"):
 
 def test_objects(id, al=3, name=u"Default"):
     logger.debug("Preparing to test the results for %s", id)
+    if al == 2:
+        logger.debug("Overriding test for country")
+        return True
     myID = id + 3600000000
     result = False
     while result == False:
@@ -429,9 +449,9 @@ def test_objects(id, al=3, name=u"Default"):
         testOB = build_object(id,al,name)
         if track.within(testOB) or track.intersects(testOB):
             logger.debug(u"We have a positive result in %s: %s", id, clean(name) )
-            result = get_data('relation({0});out tags;'.format(myID))
+            #            result = get_data('relation({0});out tags;'.format(myID))
             return True
-    logger.debug("Rejecting {0}!!!".format(id))
+    logger.debug("Rejecting %s(%s)!!!", name.encode('ascii', 'replace'), id)
     return False
 
 def get_data(searchString, returnDummy = False):
@@ -599,6 +619,7 @@ if len(myElements) == 0:
     bbox.append( [-56.0, 90.0, -13.0, 180.0, "Australia" ] ) # Australia
     bbox.append( [-56.0, -180.0, 25.0, -95.0, "Pacific" ] ) # Pacific
     bbox.append( [-90.0, -180.0, -56.0, 180.0, "Antartica" ] ) # Antartica
+    bbox.append( [-90.0, -180.0, 90.0, 180.0, "The World (Something is wrong further up)"] ) # If this ever happens, identify the missing square, this line should never happen to avoid controlling the GPX file against any country in the world.
     for n in bbox:
 #        print n
         sPoints = []
@@ -644,24 +665,13 @@ for country in myElements:
         pass
         logger.debug("Country %s have no readable name:en", cID)
     name = clean(name)
-#    logger.info("Testing GPX in %s (%s)", name, cID)
 
     logger.debug("Preparing to test %s (%s)", name, cID)
     if isinstance(name, int):
         logger.debug("Doesn't seem like {0} has a name!".format(name))
 #    elif name == "Argentina":
 #        # 4 Privince, 5 Departamento, 6 Distrito, 7 Municipio
-#        if test_objects(cID, 2):
-#            result = get_data_relation(cID, 6)
-#            for state in json.loads(json.dumps(result))['elements']:
-#                sID = state['id']
-#                if test_objects(sID, 6):
-#                    result = get_data_relation(sID, 7)
-#                    for town in json.loads(json.dumps(result))['elements']:
-#                        tID = town['id']
-#                        test_objects(tID, 7)
     elif name == "Brazil":
-        # 4 state, 8 municipality
         if test_objects(cID, 2, name):
             get_tags(country)
             result = False
@@ -713,10 +723,6 @@ for country in myElements:
                             continue
                         if test_objects(kID, 7, clean(kommune['tags']['name'])):
                                 get_tags(kommune)
-#    elif name == "Norway"
-        # 4 Fylke, 7 Kommune
-#    elif name == "Portugal"
-        # 4 Region, 7 Municipio
     elif name == "Portugal":
         if test_objects(cID, 2, name):
             get_tags(country)
