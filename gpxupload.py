@@ -17,6 +17,7 @@ from shapely.validation import explain_validity
 from shapely.wkt import loads
 from unidecode import unidecode
 from math import cos, sin, radians, degrees
+import keytree
 import datetime
 import time
 import requests
@@ -60,12 +61,21 @@ def deg2meter(deg):
 def meter2deg(meter):
     return (meter / (1852.0 * 60.0 ))
 
+def obj_from_kml(id, subdir="2"):
+    tree = etree.parse(open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".kml"))
+    kmlns = tree.getroot().tag.split('}')[0][1:]
+    placemarks = tree.findall('*/{%s}Placemark' % kmlns)
+    p0 = placemarks[0]
+    f = keytree.feature(p0)
+    shape = asShape(f.geometry)
+    return MultiPolygon(shape)
+
 def mk_kml(ob, id, name, subdir="0"):
     if no_kml:
         return
     logger.debug("Creating KML")
     filename = u"./kml/000_Default.kml"
-    name = clean(name).encode('ascii', 'ignore')
+    name = clean(name).encode('ascii', 'replace')
     try:
         ns = '{http://www.opengis.net/kml/2.2}'
         sls = styles.LineStyle(color="ffff0000")
@@ -76,7 +86,7 @@ def mk_kml(ob, id, name, subdir="0"):
         if ob.geom_type == "LineString" or ob.geom_type == "MultiLineString" or ob.geom_type == "LinearRing":
             d = kml.Document(ns, str(id), "Traces", 'GPX Visualization')
         elif ob.geom_type == "Polygon" or ob.geom_type == "MultiPolygon":
-            d = kml.Document(ns, str(id), '{0}'.format(name), 'Border visualization')
+            d = kml.Document(ns, str(id), 'Border of {0} ({1})'.format(name, id), 'Border visualization')
         else:
             d = kml.Document(ns, str(id), "Points", 'Point visualization')
         kf.append(d)
@@ -86,7 +96,8 @@ def mk_kml(ob, id, name, subdir="0"):
         if subdir == "0":
             filename = u"./kml/"+unicode(id)+u"_"+name.replace(" ", "_")+u".kml"
         else:
-            filename = u"./kml/"+unicode(subdir)+u"/"+name.replace(" ", "_")+u"_"+unicode(id)+u".kml"
+            filename = u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".kml"
+#            filename = u"./kml/"+unicode(subdir)+u"/"+name.replace(" ", "_")+u"_"+unicode(id)+u".kml"
         fil = open(filename, 'w')
         fil.write(kf.to_string(prettyprint=True))
         fil.close()
@@ -238,6 +249,14 @@ def get_tags(element):
 
 def build_object(id,al, name=u"Default"):
     shape = Point(0.0,0.0).buffer(0.0000001)
+    try:
+        shape = obj_from_kml(id, al)
+        if shape.geom_type == "Polygon" or shape.geom_type == "MultiPolygon":
+            return shape
+        shape = Point(0.0,0.0).buffer(0.0000001)
+        logger.debug("KML not returning Polygon shape")
+    except:
+        logger.debug("Not able to reconstruct KML")
     myID = id + 3600000000
     result = False
     while result == False:
@@ -407,23 +426,35 @@ def build_object(id,al, name=u"Default"):
         logger.warning("We still have %s lines that will not be handled more after this point", len(lines))
     logger.debug("Start creating MultiPolygon of chunks")
     try:
-        shape = unary_union(polygons).buffer(meter2deg(1.0))
-    except:
-        shape = cascaded_union(polygons).buffer(meter2deg(1.0))
-    try:
-        polygons.append(MultiPolygon(shape.interiors.buffer(meter2deg(1.0))))
+        shape = MultiPolygon(unary_union(polygons)).buffer(meter2deg(10.0))
+        try:
+            polygons.append(MultiPolygon(shape.interiors).buffer(meter2deg(10.0)))
+        except:
+            pass
+        try:
+            polygons.append(MultiPolygon(shape.exterior).buffer(meter2deg(10.0)))
+        except:
+            pass
     except:
         pass
     try:
-        polygons.append(MultiPolygon(shape.exterior.buffer(meter2deg(1.0))))
+        shape = cascaded_union(polygons).buffer(meter2deg(10.0))
+        try:
+            polygons.append(MultiPolygon(shape.interiors).buffer(meter2deg(10.0)))
+        except:
+            pass
+        try:
+            polygons.append(MultiPolygon(shape.exterior).buffer(meter2deg(10.0)))
+        except:
+            pass
     except:
         pass
     try:
-        shape = unary_union(polygons).buffer(meter2deg(1.0))
+        shape = MultiPolygon(unary_union(polygons)).buffer(meter2deg(10.0))
     except:
-        shape = cascaded_union(polygons).buffer(meter2deg(1.0))
+        shape = cascaded_union(polygons).buffer(meter2deg(10.0))
     try:
-        shape = MultiPolygon(shape.exterior).buffer(meter2deg(1.0))
+        shape = MultiPolygon(shape.exterior).buffer(meter2deg(10.0))
     except:
         logger.error("Failed to create MultiPolygon from extreriors of shape")
 #    print myWays
