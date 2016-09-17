@@ -12,9 +12,11 @@ import json
 from fastkml import kml, styles
 #from shapely import speedups
 from shapely.geometry import shape, mapping, LineString, MultiLineString, Point, MultiPoint, Polygon, MultiPolygon, LinearRing, asShape
+from shapely.geometry.collection import GeometryCollection
 from shapely.ops import linemerge, polygonize, cascaded_union, unary_union
 from shapely.validation import explain_validity
 from shapely.wkt import loads
+from shapely.wkb import loads
 from unidecode import unidecode
 from math import cos, sin, radians, degrees
 import keytree
@@ -22,6 +24,7 @@ import datetime
 import time
 import requests
 logger = logging.getLogger("gpxupload")
+#logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
 logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
 overpassServer = "http://overpass-api.de/api/interpreter" # Default
 #overpassServer = "http://overpass.osm.rambler.ru/cgi/interpreter"
@@ -36,7 +39,7 @@ if False:
 else:
     logger.debug("Speedups not enabled, executing default\n")
 
-no_upload = True
+no_upload = False
 no_kml = False
 
 lang = [ 'en', 'pt', 'no' ]
@@ -45,6 +48,7 @@ SQKM = ( (60.0 * 1.852) * (60.0 * 1.852) )
 result = ""
 name = u"?"
 file = ""
+nullShape = Point(0.0,0.0).buffer(0.0000001)
 
 def clean(i):
     codecList = [ 'ascii', 'iso-8859-2', 'iso-8859-1', 'iso-8859-3', 'iso-8859-4', 'iso-8859-5', 'iso-8859-6', 'iso-8859-7', 'iso-8859-8', 'iso-8859-9', 'iso-8859-10', 'iso-8859-11', 'iso-8859-12', 'iso-8859-13', 'iso-8859-14', 'iso-8859-15', 'iso-8859-16', 'mac-latin2', 'big5', 'cp037', 'cp1006', 'cp1026', 'cp1140', 'cp1250', 'cp1251', 'cp1252', 'cp1253', 'cp1254', 'cp1255', 'cp1256', 'cp1257', 'cp1258', 'cp424', 'cp437', 'cp500', 'cp720', 'cp737', 'cp755', 'cp850', 'cp852', 'cp855', 'cp856', 'cp857', 'cp858', 'cp860', 'cp861', 'cp862', 'cp863', 'cp864', 'cp865', 'cp866', 'cp869', 'cp874', 'cp875', 'cp932', 'cp949', 'cp950', 'euc_jis-2004', 'gb18030', 'gb2312', 'gbk', 'hp-roman8', 'mac_arabic', 'mac_centeuro', 'mac_croatian', 'mac_cyrillic', 'mac_farsi', 'mac_greek', 'mac_iceland', 'mac_roman', 'mac_romanian', 'mac_turkish', 'palmos', 'ptcp154', 'tis_620', 'mbcs', 'utf-8' ]
@@ -65,10 +69,24 @@ def obj_from_kml(id, subdir="2"):
     tree = etree.parse(open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".kml"))
     kmlns = tree.getroot().tag.split('}')[0][1:]
     placemarks = tree.findall('*/{%s}Placemark' % kmlns)
-    p0 = placemarks[0]
-    f = keytree.feature(p0)
-    shape = asShape(f.geometry)
-    return MultiPolygon(shape)
+    myObject = []
+    for i in placemarks:
+#        p0 = i
+#        print i, i.geom_type
+        try:
+            f = keytree.feature(i)
+            myObject.append(asShape(f.geometry))
+        except:
+            try:
+                myObject.append(asShape(wkb.loads(i)))
+            except:
+                pass
+#    p0 = placemarks[0]
+#    f = keytree.feature(p0)
+#    shape = asShape(f.geometry)
+    shape = unary_union(myObject).buffer(deg2meter(0.1))
+    logger.info("obj_from_kml have successfully created a %s with size: %s", shape.geom_type, shape.area)
+    return shape
 
 def mk_kml(ob, id, name, subdir="0"):
     if no_kml:
@@ -248,19 +266,42 @@ def get_tags(element):
     print tags
 
 def build_object(id,al, name=u"Default"):
-    shape = Point(0.0,0.0).buffer(0.0000001)
+    polygons = []
+    shape = nullShape
     try:
         shape = obj_from_kml(id, al)
         if shape.geom_type == "Polygon" or shape.geom_type == "MultiPolygon":
-            return shape
-        shape = Point(0.0,0.0).buffer(0.0000001)
-        logger.debug("KML not returning Polygon shape")
+            logger.info("Retrieved Polygon for %s (%s) from KML, with area: %s", clean(name), id, shape.area)
+#            mk_kml(shape, id, name, al)
+            if shape.area > 64800:
+                print "ObjectSizeError!!!"
+                print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
+#                return nullShape
+#                sys.exit(666)
+            elif shape.area == 0:
+                print "ObjectSizeError!!!"
+                print "{0}/{1} ({2}) have no size.".format(al, clean(name), id)
+            else:
+                print "Built from KML"
+                return shape
+#        polygons.append(shape)
+        shape = nullShape
+        logger.error("KML not returning Polygon shape")
+    except IOError:
+        # File doesn't exist, silently passing
+        pass
+#    except xml.etree.ElementTree.ParseError:
+    except etree.ParseError:
+        # Something went wrong in Parsing the file
+        pass
     except:
         logger.debug("Not able to reconstruct KML")
+        raise
     myID = id + 3600000000
     result = False
     while result == False:
-        result = get_data('relation(area:{1})["type"="boundary"]["boundary"="administrative"]["admin_level"="{0}"];out geom;'.format(al, myID))
+#        result = get_data('relation(area:{1})["type"="boundary"]["boundary"="administrative"]["admin_level"="{0}"];out geom;'.format(al, myID))
+        result = get_data('relation({0});out geom;'.format(id))
         time.sleep(30)
     # Code to convert JSON data to shapely geometry
     myElements = json.loads(json.dumps(result))['elements']
@@ -269,40 +310,42 @@ def build_object(id,al, name=u"Default"):
         for j in i['members']:
             myMembers.append(j)
     myWays = []
+    doneRound = 0
+    todoRounds = len(myMembers)
     for way in myMembers:
+        doneRound = doneRound + 1
+        print "\rProcessing {0} of {1} members".format(doneRound, todoRounds), '\r',
+        sys.stdout.flush()
         if way['type'] != 'way':
             continue
         sPoints = []
         try:
             for i in way['geometry']:
-#                if way['type'] != 'way':
-#                    continue
                 sPoints.append( [ i['lon'], i['lat'] ] )
         except:
-            logger.error("Failed to read 'geometry' for way!")
+            logger.debug("Failed to read 'geometry' for way!")
+#            print way,
             # Let us try to download the way manually and create it from there.
             newResult = False
             wID = way['ref']
             while newResult == False:
                 newResult = get_data('way({0});out geom;'.format(wID))
-#            print newResult
             newElements = json.loads(json.dumps(newResult))['elements']
 #            print newElements
             newGeometry = []
-#            newGeometry = json.loads(json.dumps(newElements))['geometry']
-            try:
-                #newGeometry = json.loads(newElements)['geometry']
-                newGeometry = json.loads(json.dumps(newElements))['geometry']
-            except:
+            for elm in newElements:
+                sPoints = []
                 try:
-                    #newGeometry = json.loads(json.dumps(newElements))['geometry']
-                    newGeometry = json.loads(newElements)['geometry']
+                    newGeometry = json.loads(json.dumps(elm))['geometry']
                 except:
-                    logger.error("Failed to get geometry")
-#            if newGeometry != []:
-#                print newGeometry
-            for p in newGeometry:
-                sPoints.append( [ p['lon'], p['lat'] ] )
+                    try:
+                        newGeometry = json.loads(elm)['geometry']
+                    except:
+                        logger.debug("Failed to get geometry")
+                for p in newGeometry:
+                    sPoints.append( [ p['lon'], p['lat'] ] )
+                if len(sPoints) > 1:
+                    myWays.append(LineString(sPoints))
             if len(sPoints) == 0:
                 # We still havn't made it, now lets try the LONG way
                 logger.debug("Still no way, now, try to download as complete objects")
@@ -310,7 +353,6 @@ def build_object(id,al, name=u"Default"):
                 while newResult == False:
                     newResult = get_data('way({0});(._;>;);out body;'.format(wID))
                 newElements = json.loads(json.dumps(newResult))['elements']
-#                print newElements
                 testNodes = []
                 testWays = []
                 no_double_testing_please = set()
@@ -319,29 +361,23 @@ def build_object(id,al, name=u"Default"):
                         testNodes.append(i)
                     elif i['type'] == "way":
                         testWays.append(i)
-#                print "We now have {0} ways and {1} nodes".format(len(testWays), len(testNodes))
                 for way in testWays:
                     wID = way['id']
-#                    if wID not in no_double_testing_please:
-#                        no_double_testing_please.add(wID)
-#                    else:
-#                        continue
-#                    print "Running with wID {0}".format(wID)
                     for node in way['nodes']:
                         for i in testNodes:
                             if node == i['id']:
                                 sPoints.append( ([ float(i['lon']), float(i['lat']) ]) )
-#                print "We now have {0} ways and {1} nodes - making way with {2} positions".format(len(testWays), len(testNodes), len(sPoints))
         if len(sPoints) > 1:
             myWays.append(LineString(sPoints))
             logger.debug("Way created with %s position tuples", len(sPoints))
         else:
             logger.error("Way have only %s position tuples", len(sPoints))
-#            print way
-#    print len(myWays)
+    print ""
+    print "We now have {0} polygons".format(len(polygons))
+    logger.debug("Completed creating all elements")
     lines = []
     rings = []
-    polygons = []
+#    polygons = []
     while len(myWays) > 0:
         i = myWays[0]
         if i.is_ring and len(i.coords) > 2:
@@ -349,7 +385,6 @@ def build_object(id,al, name=u"Default"):
         else:
             lines.append(i)
         myWays.remove(i)
-#    myWays = []
     for l in lines:
         if isinstance(l, MultiLineString):
             myWays.extend(l)
@@ -357,7 +392,6 @@ def build_object(id,al, name=u"Default"):
         else:
             myWays.append(l)
             lines.remove(l)
-#    print len(myWays)
     try:
         mergedLine = linemerge(myWays)
     except:
@@ -385,104 +419,176 @@ def build_object(id,al, name=u"Default"):
             lines.remove(l)
         except:
             try:
-                polygons.append(LineString(l).buffer(meter2deg(1.0)))
+                polygons.append(Polygon(LineString(l).buffer(meter2deg(1.0))))
                 lines.remove(l)
             except:
                 try:
-                    polygons.append(MultiLineString(l).buffer(meter2deg(1.0)))
+                    polygons.append(MultiPolygon(MultiLineString(l).buffer(meter2deg(1.0))))
                     lines.remove(l)
                 except:
                     pass
     logger.debug("We have %s rings", len(rings))
+    doneRound = 0
+    todoRounds = len(rings)
     for r in rings:
+        doneRound = doneRound + 1
+        print "\rProcessing {0} of {1} rings".format(doneRound, todoRounds), '\r',
+        sys.stdout.flush()
         polygons.append(Polygon(r).buffer(meter2deg(1.0)))
+    if len(rings) > 0:
+        print ""
+    print "We now have {0} polygons".format(len(polygons))
+    doneRound = 0
+    todoRounds = len(myWays)
     for i in myWays:
+        doneRound = doneRound + 1
+        print "\rProcessing {0} of {1} ways".format(doneRound, todoRounds), '\r',
+        sys.stdout.flush()
         try:
-            polygons.append( unary_union(i).buffer(meter2deg(1.0)) )
+            polygons.append( MultiPolygon(unary_union(i).buffer(meter2deg(1.0))) )
         except:
-            polygons.append( cascaded_union(i).buffer(meter2deg(1.0)) )
+            try:
+                polygons.append( MultiPolygon(cascaded_union(i).buffer(meter2deg(1.0))) )
+            except:
+                polygons.append( Polygon(cascaded_union(i).buffer(meter2deg(1.0))) )
+    print ""
+    print "We now have {0} polygons".format(len(polygons))
     logger.debug("Start polygonize %s lines", len(lines))
+    doneRound = 0
+    todoRounds = len(lines)
     while len(lines) > 0:
         l = lines[0]
-#        try:
-#            polygons.append( cascaded_union(l).buffer(meter2deg(1.0)) )
-#            lines.remove(l)
-#        except:
-#            pass
+        doneRound = doneRound + 1
+        print "\rProcessing {0} of {1} lines".format(doneRound, todoRounds), '\r',
+        sys.stdout.flush()
         try:
-            polygons.append(l.buffer(meter2deg(1.0)))
-            lines.remove(l)
+            polygons.append( cascaded_union(l).buffer(meter2deg(1.0)) )
         except:
             pass
-#    for err in lines:
-#        print err
+        try:
+            polygons.append(MultiPolygon(l.buffer(meter2deg(1.0))))
+        except:
+            pass
+        lines.remove(l)
+    print ""
+    print "We now have {0} polygons".format(len(polygons))
     logger.debug("Completed polygonizing lines")
     try:
-        polygons.append(linemerge(lines).buffer(meter2deg(1.0)))
+        logger.debug("Trying to polygonize remainding lines")
+        polygons.append(MultiPolygon(linemerge(lines).buffer(meter2deg(1.0))))
     except:
         pass
-    logger.debug("We have created %s polygons", len(polygons))
+    logger.info("We have created %s polygons", len(polygons))
     if (len(lines)) > 0:
         logger.warning("We still have %s lines that will not be handled more after this point", len(lines))
-    logger.debug("Start creating MultiPolygon of chunks")
+    logger.info("Start creating MultiPolygon of chunks")
     try:
+        logger.debug("MultiPolygon unary_union of polygons")
         shape = MultiPolygon(unary_union(polygons)).buffer(meter2deg(10.0))
         try:
+            logger.debug("MultiPolygon interiors of shape")
             polygons.append(MultiPolygon(shape.interiors).buffer(meter2deg(10.0)))
         except:
             pass
         try:
+            logger.debug("MultiPolygon exterior of shape")
             polygons.append(MultiPolygon(shape.exterior).buffer(meter2deg(10.0)))
         except:
             pass
     except:
         pass
     try:
-        shape = cascaded_union(polygons).buffer(meter2deg(10.0))
+        logger.debug("MultiPolygon cascaded_union of polygons")
+        shape = MultiPolygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
         try:
+            logger.debug("MultiPolygon interiors of shape")
             polygons.append(MultiPolygon(shape.interiors).buffer(meter2deg(10.0)))
         except:
             pass
         try:
+            logger.debug("MultiPolygon exterior of shape")
             polygons.append(MultiPolygon(shape.exterior).buffer(meter2deg(10.0)))
         except:
             pass
     except:
         pass
+    print "Shape is {0}".format(shape.geom_type)
+    if shape.geom_type == "MultiPolygon":
+        print "We have a MultiPolygon"
+        try:
+            for s in shape:
+                #print s
+                polygons.append(s.exterior)
+        except:
+            pass
+        print "We now have {0} polygons".format(len(polygons))
     try:
+        logger.debug("MultiPolygon unary_union of polygons")
         shape = MultiPolygon(unary_union(polygons)).buffer(meter2deg(10.0))
     except:
-        shape = cascaded_union(polygons).buffer(meter2deg(10.0))
+        logger.debug("MultiPolygon cascaded_union of Polygons")
+        try:
+            shape = MultiPolygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
+        except:
+            shape = Polygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
     try:
-        shape = MultiPolygon(shape.exterior).buffer(meter2deg(10.0))
+        logger.debug("MultiPolygon exterior of shape")
+        shape = Polygon(shape.exterior) #.buffer(meter2deg(10.0))
     except:
-        logger.error("Failed to create MultiPolygon from extreriors of shape")
-#    print myWays
-#    print shape.area, shape.geom_type, shape.is_valid
-#    print shape
+        try:
+            shape = MultiPolygon(shape.exterior)
+        except:
+            logger.error("Failed to create MultiPolygon from extreriors of shape")
     try:
-        logger.debug("Completed creating %s of collected chunks", str(shape.geom_type))
+        logger.info("Completed creating %s of collected chunks with size: %s", str(shape.geom_type), str(shape.area))
     except:
         logger.debug("Completed creating (MultiPolygon) of collected chunks")
     mk_kml(shape, id, name, al)
+#    try:
+#        newShape = obj_from_kml(id, al)
+#        if newShape.area > 64800:
+#            print "ObjectSizeError!!!"
+#            print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
+#            return nullShape
+#            sys.exit(666)
+#        if (shape.area > newShape.area):
+#            return shape
+#        return newShape
+#    except:
+#        pass
+    if shape.area > 64800:
+        print "ObjectSizeError!!!"
+        print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
+        return nullShape
+        sys.exit(666)
     return shape
 
 def test_objects(id, al=3, name=u"Default"):
-    logger.debug("Preparing to test the results for %s", id)
-    if al == 2:
-        logger.debug("Overriding test for country")
-        return True
+    logger.info("Preparing to test the results for %s (%s)", clean(name), id)
+#    if al == 2:
+#        logger.error("Overriding test for country")
+#        return True
+#    if al == 4:
+#        if id == 54882:
+#            print "Decission override for state (Espirito Santo)"
+#            return True
     myID = id + 3600000000
     result = False
     while result == False:
         result = get_data('rel(area:{4}) ->.a;.a is_in;node({0},{1},{2},{3});out ids qt 1;'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID), True)
+    testOB = nullShape
     if len(result['elements']) > 0:
         testOB = build_object(id,al,name)
-        if track.within(testOB) or track.intersects(testOB):
-            logger.debug(u"We have a positive result in %s: %s", id, clean(name) )
-            #            result = get_data('relation({0});out tags;'.format(myID))
+        if track.within(testOB):
+            logger.info(u"Track is within %s (%s) place.BBOX(%s)/track.BBOX(%s)", clean(name), id, testOB.bounds, track.bounds )
+            print "Within {0} ({1})".format(name.encode('ascii', 'replace'), id)
             return True
-    logger.debug("Rejecting %s(%s)!!!", name.encode('ascii', 'replace'), id)
+        elif track.intersects(testOB):
+            logger.info(u"Track intersects with %s (%s) place.BBOX(%s)/track.BBOX(%s)", id, clean(name), testOB.bounds, track.bounds )
+            print "Intersects {0} ({1})".format(name.encode('ascii', 'replace'), id)
+            return True
+    logger.info("Rejecting %s (%s) place.BBOX(%s)/track.BBOX(%s)!!!", name.encode('ascii', 'replace'), id, testOB.bounds, track.bounds )
+    print "Rejecting {0} ({1})".format(name.encode('ascii', 'replace'), id)
     return False
 
 def get_data(searchString, returnDummy = False):
@@ -507,7 +613,7 @@ def get_data(searchString, returnDummy = False):
         return False
     except overpass.errors.ServerLoadError as e:
         if returnDummy:
-            logger.errors("ServerLoadError caught in get_data, returning dummyJSON: %s", e)
+            logger.error("ServerLoadError caught in get_data, returning dummyJSON: %s", e)
             return json.loads('{"version": 0.6, "generator": "dummy", "elements": [{"type": "dummy"}, {"type": "dummy"}] }')
         logger.error("ServerLoadError caught in get_data, waiting for 30 seconds: %s", e)
         time.sleep(30)
@@ -554,6 +660,7 @@ def upload_gpx(gpxFile, uTags, uDescription):
     payload = { u"description": uDescription, u"tags": uTags.encode('utf-8').replace(".", "_"), u"visibility": u"trackable" }
 #    print payload
     if no_upload:
+        print payload
         sys.exit(0)
     payload = json.loads(json.dumps(payload))
     try:
@@ -646,7 +753,11 @@ if len(myElements) == 0:
     bbox.append( [-56.0, -28.0, 38.0, 64.0, "Africa" ] ) # Africa
     bbox.append( [25.0, -180.0, 84.0, -18.0, "North America" ] ) # North America
     bbox.append( [3.0, -123.0, 33.0, -56.0, "Central America" ] ) # Central America
-    bbox.append( [-57.0, -95.0, 13.0, -24.0, "South America" ] ) # South America
+#    bbox.append( [-57.0, -95.0, 13.0, -24.0, "South America" ] ) # South America
+    bbox.append( [0.0, -95.0, 13.0, -24.0, "South America (North)" ] )
+    bbox.append( [-34.0, -59.0, 0.0, -24.0, "South America (East)" ] )
+    bbox.append( [-34.0, -95.0, 0.0, -59.0, "South America (West)" ] )
+    bbox.append( [-57.0, -95.0, -34.0, -24.0, "South America (South)" ] )
     bbox.append( [-56.0, 90.0, -13.0, 180.0, "Australia" ] ) # Australia
     bbox.append( [-56.0, -180.0, 25.0, -95.0, "Pacific" ] ) # Pacific
     bbox.append( [-90.0, -180.0, -56.0, 180.0, "Antartica" ] ) # Antartica
