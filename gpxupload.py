@@ -15,8 +15,8 @@ from shapely.geometry import shape, mapping, LineString, MultiLineString, Point,
 from shapely.geometry.collection import GeometryCollection
 from shapely.ops import linemerge, polygonize, cascaded_union, unary_union
 from shapely.validation import explain_validity
-from shapely.wkt import loads
-from shapely.wkb import loads
+from shapely.wkt import loads as wkt_loads, dumps as wkt_dumps
+from shapely.wkb import loads as wkb_loads, dumps as wkb_dumps
 from unidecode import unidecode
 from math import cos, sin, radians, degrees
 import keytree
@@ -39,8 +39,9 @@ if False:
 else:
     logger.debug("Speedups not enabled, executing default\n")
 
-no_upload = False
+no_upload = True
 no_kml = False
+debuging = False
 
 lang = [ 'en', 'pt', 'no' ]
 tags = []
@@ -65,27 +66,36 @@ def deg2meter(deg):
 def meter2deg(meter):
     return (meter / (1852.0 * 60.0 ))
 
-def obj_from_kml(id, subdir="2"):
-    tree = etree.parse(open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".kml"))
-    kmlns = tree.getroot().tag.split('}')[0][1:]
-    placemarks = tree.findall('*/{%s}Placemark' % kmlns)
-    myObject = []
-    for i in placemarks:
-#        p0 = i
-#        print i, i.geom_type
-        try:
-            f = keytree.feature(i)
-            myObject.append(asShape(f.geometry))
-        except:
-            try:
-                myObject.append(asShape(wkb.loads(i)))
-            except:
-                pass
-#    p0 = placemarks[0]
-#    f = keytree.feature(p0)
-#    shape = asShape(f.geometry)
-    shape = unary_union(myObject).buffer(deg2meter(0.1))
-    logger.info("obj_from_kml have successfully created a %s with size: %s", shape.geom_type, shape.area)
+def obj_from_store(id, subdir="2"):
+    shape = nullShape
+#    return shape
+    with open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkb") as f:
+        shape = wkb_loads(f.read())
+#    tree = etree.parse(open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".kml"))
+#    kmlns = tree.getroot().tag.split('}')[0][1:]
+#    placemarks = tree.findall('*/{%s}Placemark' % kmlns)
+#    myObject = []
+#    for i in placemarks:
+##        p0 = i
+##        print i, i.geom_type
+#        try:
+#            f = keytree.feature(i)
+#            myObject.append(asShape(f.geometry))
+#        except:
+#            try:
+#                myObject.append(asShape(wkb.loads(i)))
+#            except:
+#                pass
+##    p0 = placemarks[0]
+##    f = keytree.feature(p0)
+##    shape = asShape(f.geometry)
+##    shape = unary_union(myObject).buffer(deg2meter(0.1))
+##    fil = open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkb", 'r')
+##    shape = wkt_loads(fil)
+##    shape = to_shape(wkb_loads(fil))
+##    fil.close()
+    logger.info("obj_from_store have successfully created a %s with size: %s", shape.geom_type, shape.area)
+#    print "{0} successfully loaded from KML".format(shape.geom_type)
     return shape
 
 def mk_kml(ob, id, name, subdir="0"):
@@ -135,6 +145,28 @@ def mk_kml(ob, id, name, subdir="0"):
             logger.info("SVG Saved in %s", filename)
         except:
             logger.error("Failed to create SVG")
+    try:
+        # Make WKT or WKB file
+        if subdir != "0":
+            logger.debug("Preparing for WKB file")
+            filename = u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkb"
+            fil = open(filename, 'w')
+            #print ob, wkb_dumps(ob)
+            fil.write(wkb_dumps(ob))
+            fil.close()
+    except:
+        pass
+#    try:
+#        # Make WKT or WKB file
+#        if subdir != "0":
+#            logger.debug("Preparing for WKT file")
+#            filename = u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkt"
+#            fil = open(filename, 'w')
+#            #print ob, wkt_dumps(ob)
+#            fil.write(wkt_dumps(ob))
+#            fil.close()
+#    except:
+#        pass
 
 def remove_duplicates(values):
     output = []
@@ -175,6 +207,12 @@ def get_data_relation(relationID, al=3):
 
 def get_tags(element):
     myTags = element['tags']
+    if debuging:
+        try:
+            string = clean(myTags['admin_level'])
+            tags.append(string)
+        except:
+            pass
     try:
         string = clean(myTags['name'])
         tags.append(string)
@@ -263,29 +301,30 @@ def get_tags(element):
         tags.append(string)
     except:
         pass
-    print tags
+#    print tags
 
 def build_object(id,al, name=u"Default"):
     polygons = []
     shape = nullShape
     try:
-        shape = obj_from_kml(id, al)
+        shape = obj_from_store(id, al)
         if shape.geom_type == "Polygon" or shape.geom_type == "MultiPolygon":
             logger.info("Retrieved Polygon for %s (%s) from KML, with area: %s", clean(name), id, shape.area)
 #            mk_kml(shape, id, name, al)
             if shape.area > 64800:
                 print "ObjectSizeError!!!"
-                print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
-#                return nullShape
-#                sys.exit(666)
+                print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, name.encode('ascii', 'replace'), id)
+                return nullShape
+                sys.exit(666)
             elif shape.area == 0:
                 print "ObjectSizeError!!!"
-                print "{0}/{1} ({2}) have no size.".format(al, clean(name), id)
+                print "{0}/{1} ({2}) have no size.".format(al, name.encode('ascii', 'replace'), id)
+            elif shape == nullShape:
+                print "obj_from_store returned nullShape"
             else:
-                print "Built from KML"
+#                print "Built from KML"
                 return shape
 #        polygons.append(shape)
-        shape = nullShape
         logger.error("KML not returning Polygon shape")
     except IOError:
         # File doesn't exist, silently passing
@@ -297,12 +336,16 @@ def build_object(id,al, name=u"Default"):
     except:
         logger.debug("Not able to reconstruct KML")
         raise
+    print "Starting to build {0} ({2}/{1})".format(name.encode('ascii', 'replace'), id, al)
+    shape = nullShape
     myID = id + 3600000000
     result = False
     while result == False:
 #        result = get_data('relation(area:{1})["type"="boundary"]["boundary"="administrative"]["admin_level"="{0}"];out geom;'.format(al, myID))
         result = get_data('relation({0});out geom;'.format(id))
         time.sleep(30)
+    if debuging:
+        print result
     # Code to convert JSON data to shapely geometry
     myElements = json.loads(json.dumps(result))['elements']
     myMembers = []
@@ -380,12 +423,14 @@ def build_object(id,al, name=u"Default"):
 #    polygons = []
     while len(myWays) > 0:
         i = myWays[0]
+        polygons.append(i.buffer(meter2deg(1.0)))
         if i.is_ring and len(i.coords) > 2:
             rings.append(i)
         else:
             lines.append(i)
         myWays.remove(i)
     for l in lines:
+        polygons.append(l.buffer(meter2deg(1.0)))
         if isinstance(l, MultiLineString):
             myWays.extend(l)
             lines.remove(l)
@@ -428,16 +473,6 @@ def build_object(id,al, name=u"Default"):
                 except:
                     pass
     logger.debug("We have %s rings", len(rings))
-    doneRound = 0
-    todoRounds = len(rings)
-    for r in rings:
-        doneRound = doneRound + 1
-        print "\rProcessing {0} of {1} rings".format(doneRound, todoRounds), '\r',
-        sys.stdout.flush()
-        polygons.append(Polygon(r).buffer(meter2deg(1.0)))
-    if len(rings) > 0:
-        print ""
-    print "We now have {0} polygons".format(len(polygons))
     doneRound = 0
     todoRounds = len(myWays)
     for i in myWays:
@@ -497,6 +532,30 @@ def build_object(id,al, name=u"Default"):
             pass
     except:
         pass
+    print "Shape is {0}".format(shape.geom_type)
+    if shape.geom_type == "MultiPolygon":
+        print "We have a {0} with {1} elements".format(shape.geom_type, len(shape))
+        try:
+            doneRound = 0
+            todoRounds = len(shape)
+            for s in shape:
+                doneRound = doneRound + 1
+                print "\rProcessing {0} of {1} elements".format(doneRound, todoRounds), '\r',
+                sys.stdout.flush()
+                #print s
+                try:
+                    polygons.append(s.interiors).buffer(meter2deg(10.0))
+                except:
+                    pass
+                try:
+                    polygons.append(s.exterior).buffer(meter2deg(10.0))
+                except:
+                    pass
+            print ""
+        except:
+            print "Could not make further elements"
+            pass
+        print "We now have {0} polygons".format(len(polygons))
     try:
         logger.debug("MultiPolygon cascaded_union of polygons")
         shape = MultiPolygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
@@ -514,12 +573,26 @@ def build_object(id,al, name=u"Default"):
         pass
     print "Shape is {0}".format(shape.geom_type)
     if shape.geom_type == "MultiPolygon":
-        print "We have a MultiPolygon"
+        print "We have a {0} with {1} elements".format(shape.geom_type, len(shape))
         try:
+            doneRound = 0
+            todoRounds = len(shape)
             for s in shape:
+                doneRound = doneRound + 1
+                print "\rProcessing {0} of {1} elements".format(doneRound, todoRounds), '\r',
+                sys.stdout.flush()
                 #print s
-                polygons.append(s.exterior)
+                try:
+                    polygons.append(s.interiors).buffer(meter2deg(10.0))
+                except:
+                    pass
+                try:
+                    polygons.append(s.exterior).buffer(meter2deg(10.0))
+                except:
+                    pass
+            print ""
         except:
+            print "Could not make further elements"
             pass
         print "We now have {0} polygons".format(len(polygons))
     try:
@@ -531,12 +604,22 @@ def build_object(id,al, name=u"Default"):
             shape = MultiPolygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
         except:
             shape = Polygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
+    doneRound = 0
+    todoRounds = len(rings)
+    for r in rings:
+        doneRound = doneRound + 1
+        print "\rProcessing {0} of {1} rings".format(doneRound, todoRounds), '\r',
+        sys.stdout.flush()
+        polygons.append(Polygon(r).buffer(meter2deg(1.0)))
+    if len(rings) > 0:
+        print ""
+    print "We now have {0} polygons".format(len(polygons))
     try:
         logger.debug("MultiPolygon exterior of shape")
-        shape = Polygon(shape.exterior) #.buffer(meter2deg(10.0))
+        shape = Polygon(shape.exterior).buffer(meter2deg(10.0))
     except:
         try:
-            shape = MultiPolygon(shape.exterior)
+            shape = MultiPolygon(shape.exterior).buffer(meter2deg(10.0))
         except:
             logger.error("Failed to create MultiPolygon from extreriors of shape")
     try:
@@ -545,7 +628,7 @@ def build_object(id,al, name=u"Default"):
         logger.debug("Completed creating (MultiPolygon) of collected chunks")
     mk_kml(shape, id, name, al)
 #    try:
-#        newShape = obj_from_kml(id, al)
+#        newShape = obj_from_store(id, al)
 #        if newShape.area > 64800:
 #            print "ObjectSizeError!!!"
 #            print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
@@ -558,37 +641,39 @@ def build_object(id,al, name=u"Default"):
 #        pass
     if shape.area > 64800:
         print "ObjectSizeError!!!"
-        print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
+        print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, name.encode('ascii', 'replace'), id)
         return nullShape
         sys.exit(666)
     return shape
 
 def test_objects(id, al=3, name=u"Default"):
-    logger.info("Preparing to test the results for %s (%s)", clean(name), id)
-#    if al == 2:
-#        logger.error("Overriding test for country")
-#        return True
+    logger.info("Preparing to test the results for %s (%s/%s)", clean(name), al, id)
+#    print "Starting to test {0} ({1})".format(name.encode('ascii', 'replace'), id)
+    if al == 2:
+        logger.error("Overriding test for country")
+        return True
 #    if al == 4:
 #        if id == 54882:
 #            print "Decission override for state (Espirito Santo)"
 #            return True
-    myID = id + 3600000000
-    result = False
-    while result == False:
-        result = get_data('rel(area:{4}) ->.a;.a is_in;node({0},{1},{2},{3});out ids qt 1;'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID), True)
+#    myID = id + 3600000000
+#    result = False
+#    while result == False:
+#        result = get_data('rel(area:{4}) ->.a;.a is_in;node({0},{1},{2},{3});out ids qt 1;'.format(track.bounds[1],track.bounds[0],track.bounds[3],track.bounds[2],myID), True)
     testOB = nullShape
-    if len(result['elements']) > 0:
+#    if len(result['elements']) > 0:
+    if True:
         testOB = build_object(id,al,name)
         if track.within(testOB):
             logger.info(u"Track is within %s (%s) place.BBOX(%s)/track.BBOX(%s)", clean(name), id, testOB.bounds, track.bounds )
-            print "Within {0} ({1})".format(name.encode('ascii', 'replace'), id)
+            print "Within {0} ({2}/{1})".format(name.encode('ascii', 'replace'), id, al)
             return True
         elif track.intersects(testOB):
             logger.info(u"Track intersects with %s (%s) place.BBOX(%s)/track.BBOX(%s)", id, clean(name), testOB.bounds, track.bounds )
-            print "Intersects {0} ({1})".format(name.encode('ascii', 'replace'), id)
+            print "Intersects {0} ({2}/{1})".format(name.encode('ascii', 'replace'), id, al)
             return True
-    logger.info("Rejecting %s (%s) place.BBOX(%s)/track.BBOX(%s)!!!", name.encode('ascii', 'replace'), id, testOB.bounds, track.bounds )
-    print "Rejecting {0} ({1})".format(name.encode('ascii', 'replace'), id)
+    logger.info("Rejecting %s (%s) place.BBOX(%s)/track.BBOX(%s)!!!", clean(name), id, testOB.bounds, track.bounds )
+#    print "Rejecting {0} ({1})".format(name.encode('ascii', 'replace'), id)
     return False
 
 def get_data(searchString, returnDummy = False):
@@ -661,7 +746,7 @@ def upload_gpx(gpxFile, uTags, uDescription):
 #    print payload
     if no_upload:
         print payload
-        sys.exit(0)
+        sys.exit(3)
     payload = json.loads(json.dumps(payload))
     try:
         url = "http://www.openstreetmap.org/api/0.6/gpx/create"
@@ -711,6 +796,13 @@ for trk in root.findall('{http://www.topografix.com/GPX/1/1}trk'):
             lons.append(float(point.get('lon')))
             trkpt = ([ float(point.get('lon')), float(point.get('lat')) ])
             track.append(trkpt)
+for trk in root.findall('{http://www.topografix.com/GPX/1/0}trk'):
+    for seg in trk.findall('{http://www.topografix.com/GPX/1/0}trkseg'):
+        for point in seg.findall('{http://www.topografix.com/GPX/1/0}trkpt'):
+            lats.append(float(point.get('lat')))
+            lons.append(float(point.get('lon')))
+            trkpt = ([ float(point.get('lon')), float(point.get('lat')) ])
+            track.append(trkpt)
 trackptLength = len(track)
 if len(track) > 1:
     mk_kml(LineString(track), 0, u'test_gpx')
@@ -719,7 +811,7 @@ elif len(track) == 1:
     track = Point(track[0])
 else:
     logger.critical("Selected GPX have no valid track points")
-    sys.exit(0)
+    sys.exit(404)
 lats.sort()
 lons.sort()
 trackLength = int(deg2meter(LineString(track).length))/1000.0
@@ -838,6 +930,7 @@ for country in myElements:
                             continue
                         if test_objects(mID, 8, clean(municipality['tags']['name'])):
                             get_tags(municipality)
+                            no_upload = False
 #    elif name == "Chile"
         # 4 Region, 6 Province, 8 Comunas
     elif name == "Norway":
