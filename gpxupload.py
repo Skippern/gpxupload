@@ -23,6 +23,7 @@ import keytree
 import datetime
 import time
 import requests
+import random
 logger = logging.getLogger("gpxupload")
 #logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
 logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s - %(message)s",datefmt="%Y/%m/%d %H:%M:%S:")
@@ -30,7 +31,11 @@ overpassServer = "http://overpass-api.de/api/interpreter" # Default
 #overpassServer = "http://overpass.osm.rambler.ru/cgi/interpreter"
 #overpassServer = "http://api.openstreetmap.fr/oapi/interpreter"
 #overpassServer = "http://overpass.osm.ch/api/interpreter"
-api = overpass.API(timeout=900, endpoint=overpassServer)
+overpassServers = [ "http://overpass-api.de/api/interpreter", "http://overpass.osm.rambler.ru/cgi/interpreter", "http://api.openstreetmap.fr/oapi/interpreter", "http://overpass.osm.ch/api/interpreter" ]
+overpassServer = random.choice(overpassServers)
+print "Download server: {0}".format(overpassServer)
+overpassTimeout = 900 # 15 minutes
+#overpassTimeout = 1800 # 30 minutes
 
 #if speedups.available:
 if False:
@@ -42,6 +47,15 @@ else:
 no_upload = True
 no_kml = False
 debuging = False
+let_us_upload = True
+
+delay = 60
+
+trackVisibility = u"public"
+#trackVisibility = u"private"
+#trackVisibility = u"trackable"
+#trackVisibility = u"identifiable"
+
 
 lang = [ 'en', 'pt', 'no' ]
 tags = []
@@ -68,34 +82,15 @@ def meter2deg(meter):
 
 def obj_from_store(id, subdir="2"):
     shape = nullShape
-#    return shape
-    with open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkb") as f:
-        shape = wkb_loads(f.read())
-#    tree = etree.parse(open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".kml"))
-#    kmlns = tree.getroot().tag.split('}')[0][1:]
-#    placemarks = tree.findall('*/{%s}Placemark' % kmlns)
-#    myObject = []
-#    for i in placemarks:
-##        p0 = i
-##        print i, i.geom_type
-#        try:
-#            f = keytree.feature(i)
-#            myObject.append(asShape(f.geometry))
-#        except:
-#            try:
-#                myObject.append(asShape(wkb.loads(i)))
-#            except:
-#                pass
-##    p0 = placemarks[0]
-##    f = keytree.feature(p0)
-##    shape = asShape(f.geometry)
-##    shape = unary_union(myObject).buffer(deg2meter(0.1))
-##    fil = open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkb", 'r')
-##    shape = wkt_loads(fil)
-##    shape = to_shape(wkb_loads(fil))
-##    fil.close()
+    try:
+        with open(u"./kml/"+unicode(subdir)+u"/"+unicode(id)+u".wkb") as f:
+            shape = wkb_loads(f.read())
+    except:
+#    except wkb_loads.errors.ParseException as e:
+#        logger.error("obj_from_store failed with ParseException: %s", e)
+        logger.error("obj_from_store failed with ParseException:")
+        return nullShape
     logger.info("obj_from_store have successfully created a %s with size: %s", shape.geom_type, shape.area)
-#    print "{0} successfully loaded from KML".format(shape.geom_type)
     return shape
 
 def mk_kml(ob, id, name, subdir="0"):
@@ -196,7 +191,8 @@ def get_data_bbox(minlat, minlon, maxlat, maxlon, al=2):
     if minlon > maxlon:
         logger.error("ERROR: Longitude %s greater than %s - SWAPPING", str(minlon), str(maxlon))
         minlon, maxlon = swap(minlon, maxlon)
-    searchString = 'is_in;relation["type"="boundary"]["boundary"="administrative"]["admin_level"="{4}"]({0},{1},{2},{3});out tags;'.format(minlat,minlon,maxlat,maxlon, al)
+#    searchString = 'is_in;relation["type"="boundary"]["boundary"="administrative"]["admin_level"="{4}"]({0},{1},{2},{3});out tags;'.format(minlat,minlon,maxlat,maxlon, al)
+    searchString = 'relation["type"="boundary"]["boundary"="administrative"]["admin_level"="{4}"]({0},{1},{2},{3});out tags;'.format(minlat,minlon,maxlat,maxlon, al)
     return get_data(searchString)
 
 def get_data_relation(relationID, al=3):
@@ -309,7 +305,7 @@ def build_object(id,al, name=u"Default"):
     try:
         shape = obj_from_store(id, al)
         if shape.geom_type == "Polygon" or shape.geom_type == "MultiPolygon":
-            logger.info("Retrieved Polygon for %s (%s) from KML, with area: %s", clean(name), id, shape.area)
+            logger.info("Retrieved Polygon for %s (%s/%s) from KML, with area: %s", clean(name), al, id, shape.area)
 #            mk_kml(shape, id, name, al)
             if shape.area > 64800:
                 print "ObjectSizeError!!!"
@@ -320,7 +316,8 @@ def build_object(id,al, name=u"Default"):
                 print "ObjectSizeError!!!"
                 print "{0}/{1} ({2}) have no size.".format(al, name.encode('ascii', 'replace'), id)
             elif shape == nullShape:
-                print "obj_from_store returned nullShape"
+#                print "obj_from_store returned nullShape"
+                logger.debug("obj_from_store returned nullShape")
             else:
 #                print "Built from KML"
                 return shape
@@ -665,18 +662,19 @@ def test_objects(id, al=3, name=u"Default"):
     if True:
         testOB = build_object(id,al,name)
         if track.within(testOB):
-            logger.info(u"Track is within %s (%s) place.BBOX(%s)/track.BBOX(%s)", clean(name), id, testOB.bounds, track.bounds )
+            logger.info(u"Track is within %s (%s/%s) place.BBOX(%s)/track.BBOX(%s)", clean(name), al, id, testOB.bounds, track.bounds )
             print "Within {0} ({2}/{1})".format(name.encode('ascii', 'replace'), id, al)
             return True
         elif track.intersects(testOB):
-            logger.info(u"Track intersects with %s (%s) place.BBOX(%s)/track.BBOX(%s)", id, clean(name), testOB.bounds, track.bounds )
+            logger.info(u"Track intersects with %s (%s/%s) place.BBOX(%s)/track.BBOX(%s)", clean(name), al, id, testOB.bounds, track.bounds )
             print "Intersects {0} ({2}/{1})".format(name.encode('ascii', 'replace'), id, al)
             return True
-    logger.info("Rejecting %s (%s) place.BBOX(%s)/track.BBOX(%s)!!!", clean(name), id, testOB.bounds, track.bounds )
-#    print "Rejecting {0} ({1})".format(name.encode('ascii', 'replace'), id)
+    logger.info("Rejecting %s (%s/%s) place.BBOX(%s)/track.BBOX(%s)!!!", clean(name), al, id, testOB.bounds, track.bounds )
+#    print "Rejecting {0} ({2}/{1})".format(name.encode('ascii', 'replace'), id, al)
     return False
 
 def get_data(searchString, returnDummy = False):
+    api = overpass.API(timeout=overpassTimeout, endpoint=overpassServer)
     try:
         logger.debug(searchString)
         result = api.Get(searchString, responseformat="json")
@@ -693,19 +691,19 @@ def get_data(searchString, returnDummy = False):
         logger.critical("TimeoutError caught in get_data: %s", e)
         return False
     except overpass.errors.MultipleRequestsError as e:
-        logger.error("MultipleRequestsError caught in get_data, waiting for 30 seconds: %s", e)
-        time.sleep(30)
+        logger.error("MultipleRequestsError caught in get_data, waiting for %s seconds: %s", delay, e)
+        time.sleep(delay)
         return False
     except overpass.errors.ServerLoadError as e:
         if returnDummy:
             logger.error("ServerLoadError caught in get_data, returning dummyJSON: %s", e)
             return json.loads('{"version": 0.6, "generator": "dummy", "elements": [{"type": "dummy"}, {"type": "dummy"}] }')
-        logger.error("ServerLoadError caught in get_data, waiting for 30 seconds: %s", e)
-        time.sleep(30)
+        logger.error("ServerLoadError caught in get_data, waiting for %s seconds: %s", delay, e)
+        time.sleep(delay)
         return False
     except requests.exceptions.ConnectionError as e:
-        logger.error("ConnectionError from requests caught in get_data, waiting for 30 seconds: %s", e)
-        time.sleep(30)
+        logger.error("ConnectionError from requests caught in get_data, waiting for %s seconds: %s", delay, e)
+        time.sleep(delay)
         return False
     try:
         json.loads(json.dumps(result))
@@ -714,7 +712,7 @@ def get_data(searchString, returnDummy = False):
         sys.exit(1)
         return False
     except ValueError:
-        logger.error("No Valid JSON Loaded (json.ValueError in get_data): %s", result)
+        logger.error("No Valid JSON Loaded (json.ValueError in get_data from search: %s): %s", searchString, result)
         sys.exit(1)
         return False
     try:
@@ -742,7 +740,8 @@ def upload_gpx(gpxFile, uTags, uDescription):
         logger.critical("NO PASSWORD SET FOR UPLOAD")
         print "For upload to work, you need to set the environmental variables OSM_USER and OSM_PASSWORD"
         sys.exit(99)
-    payload = { u"description": uDescription, u"tags": uTags.encode('utf-8').replace(".", "_"), u"visibility": u"trackable" }
+#    payload = { u"description": uDescription, u"tags": uTags.encode('utf-8').replace(".", "_"), u"visibility": u"trackable" }
+    payload = { u"description": uDescription, u"tags": uTags.encode('utf-8').replace(".", "_"), u"visibility": trackVisibility }
 #    print payload
     if no_upload:
         print payload
@@ -930,7 +929,8 @@ for country in myElements:
                             continue
                         if test_objects(mID, 8, clean(municipality['tags']['name'])):
                             get_tags(municipality)
-                            no_upload = False
+                            if let_us_upload:
+                                no_upload = False
 #    elif name == "Chile"
         # 4 Region, 6 Province, 8 Comunas
     elif name == "Norway":
@@ -949,7 +949,7 @@ for country in myElements:
                     get_tags(fylke)
                     result = False
                     while result == False:
-                        result = get_data_relation(rID, 7)
+                        result = get_data_relation(fID, 7)
                     for kommune in json.loads(json.dumps(result))['elements']:
                         kID = kommune['id']
                         if kID not in done:
@@ -958,7 +958,9 @@ for country in myElements:
                             continue
                         if test_objects(kID, 7, clean(kommune['tags']['name'])):
                                 get_tags(kommune)
-    elif name == "Portugal":
+                                if let_us_upload:
+                                    no_upload = False
+    elif name == "Portugal no":
         if test_objects(cID, 2, name):
             get_tags(country)
             result = False
@@ -983,6 +985,8 @@ for country in myElements:
                             continue
                         if test_objects(mID, 7, clean(municipality['tags']['name'])):
                             get_tags(municipality)
+                            if let_us_upload:
+                                no_upload = False
 #    elif name == "Uguguay"
         # 4 Department, 6 Municipio
     else:
