@@ -31,7 +31,8 @@ overpassServer = "http://overpass-api.de/api/interpreter" # Default
 #overpassServer = "http://overpass.osm.rambler.ru/cgi/interpreter"
 #overpassServer = "http://api.openstreetmap.fr/oapi/interpreter"
 #overpassServer = "http://overpass.osm.ch/api/interpreter"
-overpassServers = [ "http://overpass-api.de/api/interpreter", "http://overpass.osm.rambler.ru/cgi/interpreter", "http://api.openstreetmap.fr/oapi/interpreter", "http://overpass.osm.ch/api/interpreter" ]
+#overpassServers = [ "http://overpass-api.de/api/interpreter", "http://overpass.osm.rambler.ru/cgi/interpreter", "http://api.openstreetmap.fr/oapi/interpreter", "http://overpass.osm.ch/api/interpreter" ]
+overpassServers = [ "http://overpass-api.de/api/interpreter", "http://overpass.osm.rambler.ru/cgi/interpreter", "http://api.openstreetmap.fr/oapi/interpreter" ]
 overpassServer = random.choice(overpassServers)
 print "Download server: {0}".format(overpassServer)
 overpassTimeout = 900 # 15 minutes
@@ -48,6 +49,10 @@ no_upload = True
 no_kml = False
 debuging = False
 let_us_upload = True
+
+forceTrue = False
+forceTrueID = 1823223 # Guarapari
+forceTrueID = 1823480
 
 delay = 60
 
@@ -352,6 +357,9 @@ def build_object(id,al, name=u"Default"):
     myWays = []
     doneRound = 0
     todoRounds = len(myMembers)
+    testNodes = []
+    testWays = []
+    testRelation = []
     for way in myMembers:
         doneRound = doneRound + 1
         print "\rProcessing {0} of {1} members".format(doneRound, todoRounds), '\r',
@@ -393,14 +401,14 @@ def build_object(id,al, name=u"Default"):
                 while newResult == False:
                     newResult = get_data('way({0});(._;>;);out body;'.format(wID))
                 newElements = json.loads(json.dumps(newResult))['elements']
-                testNodes = []
-                testWays = []
                 no_double_testing_please = set()
                 for i in newElements:
                     if i['type'] == "node":
                         testNodes.append(i)
                     elif i['type'] == "way":
                         testWays.append(i)
+                    else:
+                        testRelation.append(i)
                 for way in testWays:
                     wID = way['id']
                     for node in way['nodes']:
@@ -413,10 +421,11 @@ def build_object(id,al, name=u"Default"):
         else:
             logger.error("Way have only %s position tuples", len(sPoints))
     print ""
-    print "We now have {0} polygons".format(len(polygons))
-    logger.debug("Completed creating all elements")
     lines = []
     rings = []
+    print "Relation contains {0} node and {1} relation members that will not be processed".format(len(testNodes), len(testRelation))
+    print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
+    logger.debug("Completed creating all elements")
 #    polygons = []
     while len(myWays) > 0:
         i = myWays[0]
@@ -484,7 +493,7 @@ def build_object(id,al, name=u"Default"):
             except:
                 polygons.append( Polygon(cascaded_union(i).buffer(meter2deg(1.0))) )
     print ""
-    print "We now have {0} polygons".format(len(polygons))
+    print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
     logger.debug("Start polygonize %s lines", len(lines))
     doneRound = 0
     todoRounds = len(lines)
@@ -503,7 +512,7 @@ def build_object(id,al, name=u"Default"):
             pass
         lines.remove(l)
     print ""
-    print "We now have {0} polygons".format(len(polygons))
+    print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
     logger.debug("Completed polygonizing lines")
     try:
         logger.debug("Trying to polygonize remainding lines")
@@ -532,6 +541,7 @@ def build_object(id,al, name=u"Default"):
     print "Shape is {0}".format(shape.geom_type)
     if shape.geom_type == "MultiPolygon":
         print "We have a {0} with {1} elements".format(shape.geom_type, len(shape))
+        sPoints = []
         try:
             doneRound = 0
             todoRounds = len(shape)
@@ -539,7 +549,13 @@ def build_object(id,al, name=u"Default"):
                 doneRound = doneRound + 1
                 print "\rProcessing {0} of {1} elements".format(doneRound, todoRounds), '\r',
                 sys.stdout.flush()
-                #print s
+                sPoints.append(s.centroid)
+                #print s.geom_type
+                try:
+                    if s.exterior.is_ring:
+                        rings.append(s.exterior)
+                except:
+                    pass
                 try:
                     polygons.append(s.interiors).buffer(meter2deg(10.0))
                 except:
@@ -548,11 +564,13 @@ def build_object(id,al, name=u"Default"):
                     polygons.append(s.exterior).buffer(meter2deg(10.0))
                 except:
                     pass
+            if len(sPoints) > 1:
+                polygons.append(LineString(sPoints).buffer(meter2deg(10.0)))
             print ""
         except:
             print "Could not make further elements"
             pass
-        print "We now have {0} polygons".format(len(polygons))
+        print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
     try:
         logger.debug("MultiPolygon cascaded_union of polygons")
         shape = MultiPolygon(cascaded_union(polygons).buffer(meter2deg(10.0)))
@@ -580,6 +598,11 @@ def build_object(id,al, name=u"Default"):
                 sys.stdout.flush()
                 #print s
                 try:
+                    if s.exterior.is_ring:
+                        rings.append(s.exterior)
+                except:
+                    pass
+                try:
                     polygons.append(s.interiors).buffer(meter2deg(10.0))
                 except:
                     pass
@@ -591,7 +614,7 @@ def build_object(id,al, name=u"Default"):
         except:
             print "Could not make further elements"
             pass
-        print "We now have {0} polygons".format(len(polygons))
+        print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
     try:
         logger.debug("MultiPolygon unary_union of polygons")
         shape = MultiPolygon(unary_union(polygons)).buffer(meter2deg(10.0))
@@ -610,7 +633,7 @@ def build_object(id,al, name=u"Default"):
         polygons.append(Polygon(r).buffer(meter2deg(1.0)))
     if len(rings) > 0:
         print ""
-    print "We now have {0} polygons".format(len(polygons))
+    print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
     try:
         logger.debug("MultiPolygon exterior of shape")
         shape = Polygon(shape.exterior).buffer(meter2deg(10.0))
@@ -624,18 +647,7 @@ def build_object(id,al, name=u"Default"):
     except:
         logger.debug("Completed creating (MultiPolygon) of collected chunks")
     mk_kml(shape, id, name, al)
-#    try:
-#        newShape = obj_from_store(id, al)
-#        if newShape.area > 64800:
-#            print "ObjectSizeError!!!"
-#            print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, clean(name), id)
-#            return nullShape
-#            sys.exit(666)
-#        if (shape.area > newShape.area):
-#            return shape
-#        return newShape
-#    except:
-#        pass
+    print "{0} is created as a valid {1} with area: {2}".format(name.encode('ascii', 'replace'), shape.geom_type, shape.area)
     if shape.area > 64800:
         print "ObjectSizeError!!!"
         print "{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, name.encode('ascii', 'replace'), id)
@@ -649,6 +661,9 @@ def test_objects(id, al=3, name=u"Default"):
     if al == 2:
         logger.error("Overriding test for country")
         return True
+    if forceTrue:
+        if id == forceTrueID:
+            return True
 #    if al == 4:
 #        if id == 54882:
 #            print "Decission override for state (Espirito Santo)"
@@ -703,6 +718,10 @@ def get_data(searchString, returnDummy = False):
         return False
     except requests.exceptions.ConnectionError as e:
         logger.error("ConnectionError from requests caught in get_data, waiting for %s seconds: %s", delay, e)
+        time.sleep(delay)
+        return False
+    except requests.exceptions.ChunkEncodingError as e:
+        logger.error("ChunkEncodingError from requests caught in get_data, waiting for %s seconds: %s", delay, e)
         time.sleep(delay)
         return False
     try:
