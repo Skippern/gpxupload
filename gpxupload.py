@@ -692,7 +692,7 @@ def build_object(id,al, name=u"Default"):
         newPoly.append(Polygon(r).buffer(meter2deg(1.0)))
     if len(rings) > 0:
         print ""
-    print "We now have {0} polygons and {1} rings".format(len(polygons), len(rings))
+    print "We now have {0} polygons".format(len(newPoly))
     try:
         logger.debug("Polygon unary_union of polygons")
         shape = Polygon(unary_union(newPoly)).buffer(meter2deg(10.0))
@@ -723,7 +723,7 @@ def build_object(id,al, name=u"Default"):
     except:
         logger.debug("Completed creating (MultiPolygon) of collected chunks")
     mk_kml(shape, id, name, al)
-    print u"{0} is created as a valid {1} with area: {2}".format(name, shape.geom_type, shape.area)
+    print u"Shape {0} is created as a valid {1} with area: {2}".format(name, shape.geom_type, shape.area)
     if shape.area > 64800:
         print "ObjectSizeError!!!"
         print u"{0}/{1} ({2}) is too huge, and cannot be accepted, verify where in the code this error comes from and try again!".format(al, name, id)
@@ -1720,7 +1720,7 @@ for bravo in myElements:
                                     if recursive_test(fID, foxtrot):
                                         if let_us_upload:
                                             no_upload = False
-                elif cname == u"Macau":
+                elif cname == u"Macao":
                     if recursive_test(cID, charlie):
                         result = False
                         while result == False:
@@ -4249,7 +4249,7 @@ for bravo in myElements:
                 result = get_data_relation(bID, 4)
             for delta in json.loads(json.dumps(result))['elements']:
                 dID = delta['id']
-                if recursive_test(eID, emirat):
+                if recursive_test(dID, delta):
                     if let_us_upload:
                         no_upload = False
     elif bname == u"Senegal":
@@ -5046,13 +5046,28 @@ for bravo in myElements:
                     if recursive_test(dID, delta):
                         result = False
                         while result == False:
-                            result = get_data_relation(dID, 10)
-                        for juliet in json.loads(json.dumps(result))['elements']:
-                            jID = juliet['id']
-                            if recursive_test(jID, juliet):
-                                if let_us_upload:
-                                    no_upload = False
+                            searchString = 'relation(area:{0})["type"="boundary"]["boundary"="historic"]["admin_level"="5"];out tags;'.format(dID + 3600000000)
+                            result = get_data(searchString)
+                        for echo in json.loads(json.dumps(result))['elements']:
+                            eID = echo['id']
+                            if recursive_test(eID, echo):
+                                result = False
+                                while result == False:
+                                    searchString = 'relation(area:{0})["type"="boundary"]["boundary"="historic"]["admin_level"="6"];out tags;'.format(eID + 3600000000)
+                                    result = get_data(searchString)
+                                for foxtrot in json.loads(json.dumps(result))['elements']:
+                                    fID = foxtrot['id']
+                                    if recursive_test(fID, foxtrot):
+                                        result = False
+                                        while result == False:
+                                            result = get_data_relation(fID, 10)
+                                        for juliet in json.loads(json.dumps(result))['elements']:
+                                            jID = juliet['id']
+                                            if recursive_test(jID, juliet):
+                                                if let_us_upload:
+                                                    no_upload = False
                 elif dname == u"England":
+#                    print "Testing for England 4/{0}".format(dID)
                     if recursive_test(dID, delta):
                         result = False
                         while result == False:
