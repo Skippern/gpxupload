@@ -30,7 +30,7 @@ logging.basicConfig(filename="./kml/GPXUploadEventLog.log", level=logging.DEBUG,
 overpassServers = []
 overpassServer = "http://overpass-api.de/api/interpreter" # Default
 overpassServers.append("http://overpass-api.de/api/interpreter")
-#overpassServers.append("http://overpass.osm.rambler.ru/cgi/interpreter")
+overpassServers.append("http://overpass.osm.rambler.ru/cgi/interpreter")
 overpassServers.append("http://api.openstreetmap.fr/oapi/interpreter")
 #overpassServers.append("http://overpass.osm.ch/api/interpreter")
 #overpassServers.append("http://overpass.openstreetmap.ie/api/") # Server also runs several other services so only for light usage
@@ -46,8 +46,8 @@ if speedups.available:
 else:
     logger.debug("Speedups not enabled, executing default\n")
 
-no_upload = False
-absolutely_no_upload = True
+no_upload = True
+absolutely_no_upload = False
 latinize = False
 no_kml = True
 no_svg = True
@@ -117,7 +117,7 @@ def obj_from_store(id, subdir="2"):
 #        logger.error("obj_from_store failed with ParseException: %s", e)
         logger.error("obj_from_store failed with ParseException:")
         return nullShape
-    logger.info("obj_from_store have successfully created a %s with size: %s", shape.geom_type, shape.area)
+    logger.debug("obj_from_store have successfully created a %s with size: %s", shape.geom_type, shape.area)
     return shape
 
 def mk_kml(ob, id, name, subdir="0"):
@@ -1184,9 +1184,43 @@ for bravo in myElements:
                 result = get_data_relation(bID, 4)
             for delta in json.loads(json.dumps(result))['elements']:
                 dID = delta['id']
+                dname = delta['tags']['name']
                 if recursive_test(dID, delta):
                     if let_us_upload:
                         no_upload = False
+                    if dname == u"Victoria":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 5)
+                        for echo in json.loads(json.dumps(result))['elements']:
+                            eID = echo['id']
+                            if recursive_test(eID, echo):
+                                result = False
+                                while result == False:
+                                    result = get_data_relation(eID, 6)
+                                for foxtrot in json.loads(json.dumps(result))['elements']:
+                                    fID = foxtrot['id']
+                                    if recursive_test(fID, 7):
+                                        if let_us_upload:
+                                            no_upload = False
+                    if dname == u"Tasmania" or dname == u"Northern Territory" or dname == u"New South Wales":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 6)
+                        for foxtrot in json.loads(json.dumps(result))['elements']:
+                            fID = foxtrot['id']
+                            if recursive_test(fID, foxtrot):
+                                if let_us_upload:
+                                    no_upload = False
+                    if dname == u"Australian Capital Territory":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 7)
+                        for golf in json.loads(json.dumps(result))['elements']:
+                            gID = golf['id']
+                            if recursive_test(gID, golf):
+                                if let_us_upload:
+                                    no_upload = False
     elif bname == u"Austria":
         if test_objects(bID, 2, bname):
             get_tags(bravo)
@@ -1625,7 +1659,72 @@ for bravo in myElements:
                 result = get_data_relation(bID, 4)
             for delta in json.loads(json.dumps(result))['elements']:
                 dID = delta['id']
+                dname = delta['tags']['name']
                 if recursive_test(dID, delta):
+                    if dname == u"Alberta" or dname == u"Manitoba" or dname == u"Ontario":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 6)
+                        for foxtrot in json.loads(json.dumps(result))['elements']:
+                            fID = foxtrot['id']
+                            if recursive_test(fID, foxtrot):
+                                if let_us_upload:
+                                    no_upload = False
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 8)
+                        for hotel in json.loads(json.dumps(result))['elements']:
+                            hID = hotel['id']
+                        if recursive_test(hID, hotel):
+                            if let_us_upload:
+                                no_upload = False
+                    if dname == u"British Columbia" or dname == u"New Brunswick" or dname == u"Prince Edwuard Island" or dname == u"Saskatchewan":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 6)
+                        for foxtrot in json.loads(json.dumps(result))['elements']:
+                            fID = foxtrot['id']
+                        if recursive_test(fID, foxtrot):
+                            result = False
+                            while result == False:
+                                result = get_data_relation(fID, 8)
+                            for hotel in json.loads(json.dumps(result))['elements']:
+                                hID = hotel['id']
+                                if recursive_test(hID, hotel):
+                                    if let_us_upload:
+                                        no_upload = False
+                    if dname == u"Nova Scotia":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 5)
+                        for echo in json.loads(json.dumps(result))['elements']:
+                            eID = echo['id']
+                            if recursive_test(eID, echo):
+                                if let_us_upload:
+                                    no_upload = False
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 6)
+                        for foxtrot in json.loads(json.dumps(result))['elements']:
+                            fID = foxtrot['id']
+                        if recursive_test(fID, foxtrot):
+                            result = False
+                            while result == False:
+                                result = get_data_relation(fID, 8)
+                            for hotel in json.loads(json.dumps(result))['elements']:
+                                hID = hotel['id']
+                                if recursive_test(hID, hotel):
+                                    if let_us_upload:
+                                        no_upload = False
+                    if dname == u"New Foundland and Labrador" or dname == u"Nunavat":
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 8)
+                        for hotel in json.loads(json.dumps(result))['elements']:
+                            hID = hotel['id']
+                            if recursive_test(hID, hotel):
+                                if let_us_upload:
+                                    no_upload = False
                     if let_us_upload:
                         no_upload = False
     elif bname == u"Cape Verde":
@@ -5106,12 +5205,84 @@ for bravo in myElements:
             get_tags(bravo)
             result = False
             while result == False:
+                result = get_data_relation(bID, 3)
+            for charlie in json.loads(json.dumps(result))['elements']:
+                cID = charlie['id']
+                if recursive_test(cID, charlie):
+                    if let_us_upload:
+                        no_upload = False
+            result = False
+            while result == False:
                 result = get_data_relation(bID, 4)
             for delta in json.loads(json.dumps(result))['elements']:
                 dID = delta['id']
-                if recursive_test(dID, delta):
-                    if let_us_upload:
-                        no_upload = False
+                try:
+                    dname = delta['tags']['name:en']
+                except:
+                    try:
+                        dname = delta['tags']['name']
+                    except:
+                        dname = dID
+                logger.debug("Testing internally for %s", dname)
+                if dname == dID:
+                    logger.warning("US State have no name: %s", dname)
+                    if recursive_test(dID, delta):
+                        if let_us_upload:
+                            no_upload = False
+                elif dname == "District of Colombia":
+                    if recursive_test(dID, delta):
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 8)
+                        for hotel in json.loads(json.dumps(result))['elements']:
+                            hID = hotel['id']
+                            if recursive_test(hID, hotel):
+                                if let_us_upload:
+                                    no_upload = False
+                elif dname == "Connecticut":
+                    if recursive_test(dID, delta):
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 6)
+                        for foxtrot in json.loads(json.dumps(result))['elements']:
+                            fID = foxtrot['id']
+                            if recursive_test(fID, foxtrot):
+                                if let_us_upload:
+                                    no_upload = False
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 8)
+                        for hotel in json.loads(json.dumps(result))['elements']:
+                            hID = hotel['id']
+                            if recursive_test(hID, hotel):
+                                if let_us_upload:
+                                    no_upload = False
+                else:
+                    if recursive_test(dID, delta):
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 5)
+                        for echo in json.loads(json.dumps(result))['elements']:
+                            eID = echo['id']
+                            if recursive_test(eID, echo):
+                                if let_us_upload:
+                                    no_upload = False
+                        result = False
+                        while result == False:
+                            result = get_data_relation(dID, 6)
+                        for foxtrot in json.loads(json.dumps(result))['elements']:
+                            fID = foxtrot['id']
+                            if recursive_test(fID, foxtrot):
+                                if let_us_upload:
+                                    no_upload = False
+                                result = False
+                                while result == False:
+                                    result = get_data_relation(fID, 8)
+                                for hotel in json.loads(json.dumps(result))['elements']:
+                                    hID = hotel['id']
+                                    if recursive_test(hID, hotel):
+                                        if let_us_upload:
+                                            no_upload = False
     elif bname == u"Uruguay":
         if test_objects(bID, 2, bname):
             get_tags(bravo)
