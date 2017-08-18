@@ -1,0 +1,7 @@
+# apt install libgeom-dev
+
+Shapely
+overpass
+numpy
+fastkml
+unidecode
