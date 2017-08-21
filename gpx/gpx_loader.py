@@ -33,25 +33,29 @@ __OVERPASS_OVERLOAD_DELAY = 60  # 5 * 60
 __MAX_RETRIES = 10
 
 
-def __get_from_overpass(search_string, last):
+def __get_from_overpass(search_string, geojson, last):
     """
-
     :param str search_string: The overlass QL string.
+    :param bool geojson: If the format should be geojson, not json.
     :param bool last: If this is the last try.
     :return: The json result or None if failed.
     """
     delay = __OVERPASS_RETRY_DELAY
     try:
+        response_format = 'json'
+        if geojson:
+            response_format = 'geojson'
         api = overpass.API(timeout=900, endpoint=__SERVER)
-        result = api.Get(search_string, responseformat='json')
+        result = api.Get(search_string, responseformat=response_format)
         if result is not None:
             # print repr(result)
             # Hack to ensure JSON object correctness????
             result = json.loads(json.dumps(result))
 
-            elements = result['elements']
-            if len(elements) < 1:
-                __LOG.debug(u'__get_from_overpass: json in get_data contains empty ["elements"]!')
+            if not geojson:
+                elements = result['elements']
+                if len(elements) < 1:
+                    __LOG.debug(u'__get_from_overpass: json in get_data contains empty ["elements"]!')
             return result
         __LOG.error(u'__get_from_overpass: API returned None')
 
@@ -88,14 +92,15 @@ def __get_from_overpass(search_string, last):
     return None
 
 
-def get_data(search_string):
+def get_data(search_string, geojson=False):
     """
     :param str|unicode search_string:
+    :param geojson: If the response should be geoJSON.
     :return dict: JSON data dictionary
     """
     __LOG.info(u'get_data: %s' % search_string)
     for i in range(1, __MAX_RETRIES + 1):
-        data = __get_from_overpass(search_string, i >= __MAX_RETRIES)
+        data = __get_from_overpass(search_string, geojson, i >= __MAX_RETRIES)
         if data is not None:
             return data
     raise Exception(u'Max overpass retries overload')
@@ -151,7 +156,7 @@ def get_geometry_for_relation(relation_id, level):
     """
     :param int relation_id: The relation ID.
     :param int level: The admin level.
-    :return: The shape returned.
+    :return: The geojson for the relation.
     """
     area_id = relation_id + 3600000000
     # search_string = ('is_in;relation' +
@@ -164,6 +169,6 @@ def get_geometry_for_relation(relation_id, level):
                      '["type"="boundary"]' +
                      '["boundary"="administrative"]' +
                      ('["admin_level"="%s"] -> ._;' % level) +
-                     'way(r:"outer") + way(r:"inner");' +
+                     'way(r:"outer");' +
                      'out geom;')
-    return get_data(search_string)
+    return get_data(search_string, True)

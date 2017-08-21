@@ -57,7 +57,7 @@ def meter2deg(meter):
     :param float meter: Meters.
     :return float: Degrees.
     """
-    return meter / (1852.0 * 60.0 )
+    return meter / (1852.0 * 60.0)
 
 
 def swap(a, b):

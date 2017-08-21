@@ -52,7 +52,7 @@ class CountryResolver(GpxResolver):
         """
         accepted = False
         tags = []
-        country = gpx_data.load_object(self.id, 2, self.name)
+        country = gpx_data.load_geo_shape(self.id, 2, self.name)
         if gpx_utils.test_object(track, country):
             accepted = True
             tags.extend(gpx_data.get_tags(country['tags']))
@@ -121,7 +121,7 @@ class LinearResolver(GpxResolver):
                 continue
 
             if rel_level is next_level:
-                region = gpx_data.load_object(rel_id, rel_level, rel_name)
+                region = gpx_data.load_geo_shape(rel_id, rel_level, rel_name)
                 if region is None:
                     continue
 
@@ -153,7 +153,7 @@ class LinearResolver(GpxResolver):
         """
         accepted = False
         tags = []
-        country = gpx_data.load_object(self.id, 2, self.name)
+        country = gpx_data.load_geo_shape(self.id, 2, self.name)
         if gpx_utils.test_object(track, country):
             tags.extend(gpx_data.get_tags(country['tags']))
             try:
@@ -280,7 +280,7 @@ class TreeResolver(GpxResolver):
         """
         accepted = False
         tags = []
-        region = gpx_data.load_object(obj_id, obj_level, name)
+        region = gpx_data.load_geo_shape(obj_id, obj_level, name)
         if gpx_utils.test_object(track, region):
             tags.extend(gpx_data.get_tags(region['tags']))
             rel_name = gpx_data.get_name(region)

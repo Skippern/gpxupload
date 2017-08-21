@@ -5,7 +5,9 @@ import json
 import logging
 import sys
 
+from gpx import gpx_data
 from gpx import gpx_loader
+from gpx import gpx_store
 
 # from gpx import gpx_data
 
@@ -45,8 +47,10 @@ root.addHandler(ch)
 # track.BBOX((47.62998, 28.677306, 48.37961, 29.391003))
 
 
-relation_id = 406567
-level = 4
+#relation_id = 406567
+#level = 4
+relation_id = 305099
+level = 2
 
 # with open("out.json") as f:
 #    tmp = json.loads(f.read())
@@ -56,8 +60,15 @@ level = 4
 #    print
 #    print "Area: %s / %s" % (tmp.area, tmp.geom_type)
 
-tmp = gpx_loader.get_relations_in_object(relation_id, level)
-
+# Test new geometry building!
+if True:
+    data = gpx_loader.get_geometry_for_relation(relation_id, level)
+    # with open('geom.json', 'r') as f:
+    #     data = json.loads(f.read())
+    with open('geom.json', 'w') as f:
+        f.write(json.dumps(data))
+    obj = gpx_data.geojson_to_geometry(data)
+    gpx_store.store_kml(obj, relation_id, level)
 
 # tmp = gpx_loader.get_data(
 #    'relation' +
@@ -67,7 +78,9 @@ tmp = gpx_loader.get_relations_in_object(relation_id, level)
 #    '(-52.204992,-69.392213,63.434391,10.501664);' +
 #    'out tags;')
 
-with open('out.json', 'w') as f:
-    f.write(json.dumps(tmp))
+if False:
+    tmp = gpx_loader.get_relations_in_object(relation_id, level)
+    with open('geom.json', 'w') as f:
+        f.write(json.dumps(tmp))
 
 # print repr(tmp)
