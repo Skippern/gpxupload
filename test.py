@@ -5,7 +5,9 @@ import json
 import logging
 import sys
 
-from gpx import gpx_data
+from gpx import gpx_loader
+
+# from gpx import gpx_data
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -46,22 +48,16 @@ root.addHandler(ch)
 relation_id = 406567
 level = 4
 
-with open("out.json") as f:
-    tmp = json.loads(f.read())
-    tmp = gpx_data.to_geometry(tmp)
-    print
-    print "----------------------------------------"
-    print
-    print "Area: %s / %s" % (tmp.area, tmp.geom_type)
+# with open("out.json") as f:
+#    tmp = json.loads(f.read())
+#    tmp = gpx_data.to_geometry(tmp)
+#    print
+#    print "----------------------------------------"
+#    print
+#    print "Area: %s / %s" % (tmp.area, tmp.geom_type)
 
-# tmp = gpx_loader.get_data(
-#    ('relation(area:%s)' % (3600000000 + area_id)) +
-#    '["type"="boundary"]' +
-#    '["boundary"="administrative"]' +
-#    ('["admin_level"="%s"]->._;' % level) +
-#    'way(r:"outer");' +
-#    'out geom;')
-#
+tmp = gpx_loader.get_relations_in_object(relation_id, level)
+
 
 # tmp = gpx_loader.get_data(
 #    'relation' +
@@ -71,7 +67,7 @@ with open("out.json") as f:
 #    '(-52.204992,-69.392213,63.434391,10.501664);' +
 #    'out tags;')
 
-# with open('out.svg', 'w') as f:
-#     f.write(tmp.svg())
+with open('out.json', 'w') as f:
+    f.write(json.dumps(tmp))
 
 # print repr(tmp)

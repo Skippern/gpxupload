@@ -7,11 +7,14 @@ import gpx_data
 import gpx_loader
 import gpx_utils
 
-__LOG = logging.getLogger('gpx_resolver')
-
 
 class GpxResolver(object):
     def __init__(self, obj_id, name):
+        """
+        :param int obj_id: Object ID of the region (admin level 2)
+        :param unicode name: The name of the region (country name).
+        """
+        self._LOG = logging.getLogger('resolver.%s' % self.__class__.__name__)
         self.id = obj_id
         self.name = name
         pass
@@ -34,8 +37,8 @@ class CountryResolver(GpxResolver):
     """
     def __init__(self, obj_id, name):
         """
-        :param obj_id: Object ID of the region (admin level 2)
-        :param name: The name of the region (country name).
+        :param int obj_id: Object ID of the region (admin level 2)
+        :param unicode name: The name of the region (country name).
         """
         super(CountryResolver, self).__init__(obj_id, name)
 
@@ -47,12 +50,13 @@ class CountryResolver(GpxResolver):
         :return (bool, []): If the resolution did find / match the region, and a list of tags
                             associated with that region.
         """
-        ok = False
+        accepted = False
         tags = []
         country = gpx_data.load_object(self.id, 2, self.name)
         if gpx_utils.test_object(track, country):
+            accepted = True
             tags.extend(gpx_data.get_tags(country['tags']))
-        return ok, tags
+        return accepted, tags
 
 
 class LinearResolver(GpxResolver):
@@ -80,19 +84,19 @@ class LinearResolver(GpxResolver):
     """
     def __init__(self, obj_id, name, levels=None, accept=0):
         """
-        :param obj_id: Object ID of the region (admin level 2)
-        :param name: The name of the region (country name).
-        :param levels: The levels to test in the region.
+        :param int obj_id: Object ID of the region (admin level 2)
+        :param unicode name: The name of the region (country name).
+        :param [] levels: The levels to test in the region.
         """
         super(LinearResolver, self).__init__(obj_id, name)
         if levels is None:
-            raise Exception("Invalid rule, no levels to check for %s", name)
+            raise Exception(u'Invalid rule, no levels to check for %s', name)
 
         self.levels = levels
         if accept is 0:
             accept = levels[-1]
         elif accept is not 2 and accept not in levels:
-            raise Exception("Invalid rule, accept level (%s) not in test-levels %s: %s" %
+            raise Exception(u'Invalid rule, accept level (%s) not in test-levels %s: %s' %
                             (accept, levels, name))
         self.accept = accept
 
@@ -107,36 +111,33 @@ class LinearResolver(GpxResolver):
         next_level = levels[0]
         recurse_levels = levels[1:]
 
-        relations = gpx_loader.get_relations_in_object(obj_level, obj_id)
+        relations = gpx_loader.get_relations_in_object(obj_id, next_level)
         for rel in relations['elements']:
             try:
                 rel_id = rel['id']
                 rel_level = rel['tags']['admin_level']
-                try:
-                    rel_name = rel['tags']['name']
-                except KeyError:
-                    try:
-                        rel_name = rel['tags']['name:en']
-                    except KeyError:
-                        rel_name = str(rel_id)
-                rel_name = gpx_utils.enforce_unicode(rel_name)
-
-                if rel_level is next_level:
-                    region = gpx_data.load_object(rel_id, rel_level, rel_name)
-                    if region is None:
-                        continue
-
-                    if gpx_utils.test_object(track, region):
-                        if self.accept == rel_level:
-                            accepted = True
-
-                        tags.extend(gpx_data.get_tags(region['tags']))
-                        reg_accept, reg_tags = self.__test_recursive(track, rel_id, rel_level, recurse_levels)
-                        if reg_accept:
-                            accepted = True
-                            tags.extend(reg_tags)
+                rel_name = gpx_data.get_name(rel)
             except KeyError:
                 continue
+
+            if rel_level is next_level:
+                region = gpx_data.load_object(rel_id, rel_level, rel_name)
+                if region is None:
+                    continue
+
+                if gpx_utils.test_object(track, region):
+                    if self.accept == rel_level:
+                        accepted = True
+
+                    tags.extend(gpx_data.get_tags(region['tags']))
+                    reg_accept, reg_tags = self.__test_recursive(track, rel_id, rel_level, recurse_levels)
+                    if reg_accept:
+                        accepted = True
+                        tags.extend(reg_tags)
+
+                    if not accepted:
+                        raise Exception(u'Region matched, but not accepted: (%s/%s) %s' %
+                                        (rel_level, rel_id, rel_name))
 
         if not accepted:
             tags = []
@@ -150,15 +151,20 @@ class LinearResolver(GpxResolver):
         :return (bool, []): If the resolution did find / match the region, and a list of tags
                             associated with that region.
         """
-        ok = False
+        accepted = False
         tags = []
         country = gpx_data.load_object(self.id, 2, self.name)
         if gpx_utils.test_object(track, country):
             tags.extend(gpx_data.get_tags(country['tags']))
-            ok, rel_tags = self.__test_recursive(track, self.id, 2)
-            if ok:
+            try:
+                accepted, rel_tags = self.__test_recursive(track, self.id, 2, self.levels)
+            except Exception as e:
+                raise Exception(u'Error matching %s: %s' % (self.name, e.message))
+            if accepted:
                 tags.extend(rel_tags)
-        return ok, tags
+            else:
+                raise Exception(u'Country matched but not accepted: %s', self.name)
+        return accepted, tags
 
 
 class TreeResolver(GpxResolver):
@@ -194,14 +200,98 @@ class TreeResolver(GpxResolver):
            - Else search for level 6, and if found:
                - Search for level 8, and if found accept.
 
-        :param int obj_id: The country object ID.
-        :param unicode name: The name of the country.
+        :param int obj_id: Object ID of the region (admin level 2)
+        :param unicode name: The name of the region (country name).
         :param dict tree: The rule tree.
         """
         super(TreeResolver, self).__init__(obj_id, name)
         if tree is None:
-            raise Exception("TreeRule for %s (%s) has no tree" % (name, obj_id))
+            raise Exception(u'TreeRule for %s (%s) has no tree' % (name, obj_id))
         self.tree = tree
+
+    def __test_recursive(self, track, region, tree, name):
+        """
+        This object has already matched the region.
+
+        :param track: The track to test.
+        :param dict region: The rules to test.
+        :param bool|dict tree: The rules for handling the region.
+        :param unicode name: The region name.
+        :return (bool, []): True if accepted and list of tags.
+        """
+        if not isinstance(tree, dict):
+            if tree is True:
+                return True, []
+            raise Exception(u'Invalid rule: ' + repr(tree))
+
+        # A name rule replaces the current rule.
+        if name in tree.keys():
+            return self.__test_recursive(track, region, tree[name], name)
+
+        try:
+            region_id = region['id']
+            region_level = region['tags']['admin_level']
+        except KeyError:
+            return False, []
+
+        accepted = False
+        tags = []
+        for criteria, rule in tree:
+            if isinstance(criteria, int):
+                if criteria is region_level:
+                    # If the rule has the same admin level as the current region,
+                    # then the rule MUST be 'True', and causes the region to be accepted
+                    # even if no sub-region is matching.
+                    if rule is True:
+                        accepted = True
+                    else:
+                        raise Exception(u'Invalid self-level rule on level %s, must be True' % criteria)
+                elif criteria > region_level:
+                    relations = gpx_loader.get_relations_in_object(region_id, criteria)
+                    for rel in relations['elements']:
+                        try:
+                            rel_id = rel['id']
+                            rel_level = rel['tags']['admin_level']
+                            rel_name = gpx_data.get_name(rel)
+                        except KeyError:
+                            continue
+                        if rel_level is not criteria:
+                            continue
+
+                        rel_ok, rel_tags = self.__test_tree_recursive(
+                                track, rel_id, rel_level, tree[criteria], rel_name)
+                        if rel_ok:
+                            tags.extend(rel_tags)
+                else:
+                    # continue / ignore rule?
+                    raise Exception(u'Criteria level below region level (%s < %s)' %
+                                    (criteria, region_level))
+
+        return accepted, tags
+
+    def __test_tree_recursive(self, track, obj_id, obj_level, tree, name):
+        """
+        :param track: The track to test.
+        :param int obj_id: The object ID to test against.
+        :param int obj_level: The administrative level of the object
+        :param bool|dict tree: The rule tree
+        :param unicode name: Name of the region to test
+        :return (bool, []): True if accepted and list of tags.
+        """
+        accepted = False
+        tags = []
+        region = gpx_data.load_object(obj_id, obj_level, name)
+        if gpx_utils.test_object(track, region):
+            tags.extend(gpx_data.get_tags(region['tags']))
+            rel_name = gpx_data.get_name(region)
+            # Do the actual test for the region.
+            accepted, rel_tags = self.__test_recursive(track, region, tree, rel_name)
+            if accepted:
+                tags.extend(rel_tags)
+            else:
+                raise Exception(u'Region matched, but not accepted: (%s/%s) %s' %
+                                (obj_level, obj_id, name))
+        return accepted, tags
 
     def test(self, track):
         """
@@ -211,5 +301,8 @@ class TreeResolver(GpxResolver):
         :return (bool, []): If the resolution did find / match the region, and a list of tags
                             associated with that region.
         """
-        # TODO: Implement!
-        return False, []
+        try:
+            return self.__test_tree_recursive(track, self.id, 2, self.tree, self.name)
+        except Exception as e:
+            self._LOG.error(u'Failed in %s: %s' % (self.name, e.message))
+            raise e

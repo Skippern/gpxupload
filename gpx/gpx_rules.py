@@ -9,23 +9,27 @@ __LOG = logging.getLogger('gpx_rules')
 
 
 class Rule(object):
-    def __init__(self, type, **kwargs):
-        self.type = type
+    def __init__(self, rule_type, **kwargs):
+        """
+        :param str rule_type: The rule type.
+        :param **kwargs: KW args for the resolver.
+        """
+        self.rule_type = str(rule_type)
         self.kwargs = kwargs
 
     def create(self, obj_id, obj_name):
         """
         :param int obj_id: The object ID for the country.
         :param unicode obj_name: The country name
-        :return GpxResolver: The resolver to use.
+        :return gpx_resolver.GpxResolver: The resolver to use.
         """
-        if self.type is 'linear':
+        if self.rule_type is 'linear':
             return gpx_resolver.LinearResolver(obj_id, obj_name, **self.kwargs)
-        if self.type is 'tree':
+        elif self.rule_type is 'tree':
             return gpx_resolver.TreeResolver(obj_id, obj_name, **self.kwargs)
-        elif self.type is 'country':
+        elif self.rule_type is 'country':
             return gpx_resolver.CountryResolver(obj_id, obj_name)
-        raise Exception('Unknown rule type for country %s: %s' % (obj_name, self.type))
+        raise Exception(u'Unknown rule type for country %s: %s' % (obj_name, self.rule_type))
 
 
 # Keep rules in their respective continental group, and
@@ -49,7 +53,7 @@ __NAME_RULES = dict({
     u'Belgium': Rule('tree', tree={4: {6: True, 7: {8: True}}}),
     u'Bosnia and Herzegovina': Rule(
         'tree',
-        tree={4: {u'Brcko district of Bosnia and Herzegovina':True,
+        tree={4: {u'Brcko district of Bosnia and Herzegovina': True,
                   u'Republika Srpska': {7: True},
                   5: {6: True, 7: True}}}),
     u'Bulgaria': Rule('linear', levels=[6, 8]),
@@ -122,10 +126,10 @@ def __get_resolver(obj_id, obj_name):
     if obj_name in __NAME_RULES.keys():
         return __NAME_RULES[obj_name].create(obj_id, obj_name)
     elif obj_name is None:
-        __LOG.warn("Null country name: %s" % obj_id)
-        return gpx_resolver.GpxResolver(obj_id, obj_name)
+        __LOG.warn(u'Null country name: %s' % obj_id)
+        return gpx_resolver.GpxResolver(obj_id, u'Unknown')
     else:
-        __LOG.warn("No rule for country: %s / %s, matching country only" % (obj_id, obj_name))
+        __LOG.warn(u'No rule for country: %s / %s, matching country only' % (obj_id, obj_name))
         return gpx_resolver.CountryResolver(obj_id, obj_name)
 
 

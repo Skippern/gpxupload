@@ -12,11 +12,27 @@ import gpx_loader
 import gpx_store
 import gpx_utils
 
-__LOG = logging.getLogger("gpx_data")
+__LOG = logging.getLogger('gpx_data')
 __1MD = gpx_utils.meter2deg(1.0)
 
 __DEBUGGING = False
 __NAME_LANGUAGES = ['en', 'no', 'pt']
+
+
+def get_name(data):
+    """
+    :param dict data: relation data
+    :return unicode: relation name
+    """
+    rel_id = data['id']
+    try:
+        rel_name = data['tags']['name']
+    except KeyError:
+        try:
+            rel_name = data['tags']['name:en']
+        except KeyError:
+            rel_name = str(rel_id)
+    return gpx_utils.enforce_unicode(rel_name)
 
 
 def get_tags(tags):
@@ -519,7 +535,7 @@ def load_object(obj_id, admin_level, name):
     if obj is not None:
         return obj
 
-    __LOG.info("Starting to build %s/%s (%s)" % (admin_level, obj_id, name))
+    __LOG.info(u"Starting to build %s/%s (%s)" % (admin_level, obj_id, name))
 
     obj = build_object(obj_id, admin_level, name)
 

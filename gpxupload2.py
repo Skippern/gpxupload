@@ -8,7 +8,7 @@ import sys
 import xml.etree.ElementTree as etree
 
 from shapely import speedups
-from shapely.geometry import LineString, Point, MultiPoint, Polygon
+from shapely.geometry import LineString, Point, Polygon
 
 from gpx import gpx_loader
 from gpx import gpx_rules
@@ -32,9 +32,7 @@ delay = 60
 
 tags = []
 SQKM = ((60.0 * 1.852) * (60.0 * 1.852))
-result = ""
-name = u"?"
-file = ""
+input_file = ""
 nullShape = Point(0.0, 0.0).buffer(0.0000001)
 
 
@@ -42,18 +40,18 @@ __ENABLE_KML = True
 __ENABLE_WKB = True
 
 
-def mk_kml(ob, id, name, subdir="0"):
+def mk_kml(obj, obj_id, obj_name, subdir="0"):
     """
-    :param ob:
-    :param id:
-    :param name:
+    :param obj:
+    :param obj_id:
+    :param obj_name:
     :param subdir:
     :return:
     """
     if __ENABLE_KML:
-        gpx_store.store_kml(ob, id, int(subdir), name)
+        gpx_store.store_kml(obj, obj_id, int(subdir), obj_name)
     if __ENABLE_WKB:
-        gpx_store.store_wkb(ob, id, int(subdir))
+        gpx_store.store_wkb(obj, obj_id, int(subdir))
 
 
 # print tags
@@ -62,20 +60,21 @@ if len(sys.argv) < 2:
     print "Usage: gpxtest.py <GPX file>"
     sys.exit(0)
 else:
-    file = sys.argv[1]
+    input_file = sys.argv[1]
 
 try:
-    gpx_file = open(file, 'r')
-    logger.info("Opened %s", file)
+    gpx_file = open(input_file, 'r')
+    logger.info("Opened %s", input_file)
 except IOError:
-    logger.critical("Could not find file: %s\n\n", file)
+    logger.critical("Could not find file: %s\n\n", input_file)
     sys.exit(1)
-print "File {0} loaded successfully".format(file)
+print "File {0} loaded successfully".format(input_file)
 
 tree = etree.parse(gpx_file)
 root = tree.getroot()
 
-track, bbox = gpx_store.load_gpx(file)
+track, bbox = gpx_store.load_gpx(input_file)
+track_pt_length = len(track)
 
 
 if track.geom_type == "Point":
@@ -98,52 +97,51 @@ myElements = result['elements']
 # print myElements
 if len(myElements) == 0:
     logger.debug("No countries found in first run, testing per continent")
-    global_region = []
-    #    global_region.append( [min.lat, min.lon, max.lat, max.lon, "Identifier" ] )
-    global_region.append([35.0, 135.0, 84.0, 180.0, "East Asia/NE"])
-    global_region.append([-14.0, 135.0, 35.0, 180.0, "East Asia/SE"])
-    global_region.append([10.0, 113.0, 35.0, 135.0, "East Asia/SW/1"])
-    global_region.append([10.0, 91.0, 35.0, 113.0, "East Asia/SW/2"])
-    global_region.append([-14.0, 91.0, 10.0, 113.0, "East Asia/SW/3"])
-    global_region.append([-14.0, 113.0, 10.0, 135.0, "East Asia/SW/4"])
-    global_region.append([35.0, 91.0, 84.0, 135.0, "East Asia/NW"])
-    global_region.append([10.0, 32.0, 40.0, 65.0, "Arabia"])
-    global_region.append([-11.0, 53.0, 84.0, 91.0, "Central Asia"])
-    global_region.append([32.0, 26.0, 84.0, 53.0, "East Europe"])
-    global_region.append([35.0, -35.0, 84.0, 0.0, "West Europe (West)"])
-    global_region.append([47.0, 13.0, 59.0, 26.0, "West Europe (South/1)"])
-    global_region.append([35.0, 13.0, 47.0, 26.0, "West Europe (South/2)"])
-    global_region.append([35.0, 0.0, 47.0, 13.0, "West Europe (South/3)"])
-    global_region.append([47.0, 0.0, 59.0, 13.0, "West Europe (South/4)"])
-    global_region.append([59.0, 0.0, 84.0, 26.0, "West Europe (North)"])
-    global_region.append([28.0, -28.0, 38.0, 64.0, "Mediterania"])
-    global_region.append([-56.0, -28.0, 28.0, 64.0, "Africa"])
-    global_region.append([25.0, -180.0, 84.0, -126.0, "North America (West)"])
-    global_region.append([25.0, -126.0, 84.0, -72.0, "North America (Central)"])
-    global_region.append([25.0, -72.0, 84.0, -18.0, "North America (East)"])
-    global_region.append([3.0, -123.0, 33.0, -56.0, "Central America"])
-    global_region.append([0.0, -95.0, 13.0, -24.0, "South America (North)"])
-    global_region.append([-34.0, -59.0, 0.0, -24.0, "South America (East)"])
-    global_region.append([-34.0, -95.0, 0.0, -59.0, "South America (West)"])
-    global_region.append([-57.0, -95.0, -34.0, -24.0, "South America (South)"])
-    global_region.append([-56.0, 90.0, -13.0, 180.0, "Australia"])
-    global_region.append([-56.0, -180.0, 25.0, -95.0, "Pacific"])
-    global_region.append([-90.0, -180.0, -56.0, 180.0, "Antartica"])
-    global_region.append([83.0, -180.0, 90.0, 180.0, "Arctic"])
-    global_region.append([-90.0, -180.0, 90.0, 180.0,
-                 "The World (Something is wrong further up)"])  # If this ever happens, identify the missing square, this line should never happen to avoid controlling the GPX file against any country in the world.
+    #                [min.lat, min.lon, max.lat, max.lon, "Identifier" ],
+    global_region = [[35.0, 135.0, 84.0, 180.0, "East Asia/NE"],
+                     [-14.0, 135.0, 35.0, 180.0, "East Asia/SE"],
+                     [10.0, 113.0, 35.0, 135.0, "East Asia/SW/1"],
+                     [10.0, 91.0, 35.0, 113.0, "East Asia/SW/2"],
+                     [-14.0, 91.0, 10.0, 113.0, "East Asia/SW/3"],
+                     [-14.0, 113.0, 10.0, 135.0, "East Asia/SW/4"],
+                     [35.0, 91.0, 84.0, 135.0, "East Asia/NW"],
+                     [10.0, 32.0, 40.0, 65.0, "Arabia"],
+                     [-11.0, 53.0, 84.0, 91.0, "Central Asia"],
+                     [32.0, 26.0, 84.0, 53.0, "East Europe"],
+                     [35.0, -35.0, 84.0, 0.0, "West Europe (West)"],
+                     [47.0, 13.0, 59.0, 26.0, "West Europe (South/1)"],
+                     [35.0, 13.0, 47.0, 26.0, "West Europe (South/2)"],
+                     [35.0, 0.0, 47.0, 13.0, "West Europe (South/3)"],
+                     [47.0, 0.0, 59.0, 13.0, "West Europe (South/4)"],
+                     [59.0, 0.0, 84.0, 26.0, "West Europe (North)"],
+                     [28.0, -28.0, 38.0, 64.0, "Mediterania"],
+                     [-56.0, -28.0, 28.0, 64.0, "Africa"],
+                     [25.0, -180.0, 84.0, -126.0, "North America (West)"],
+                     [25.0, -126.0, 84.0, -72.0, "North America (Central)"],
+                     [25.0, -72.0, 84.0, -18.0, "North America (East)"],
+                     [3.0, -123.0, 33.0, -56.0, "Central America"],
+                     [0.0, -95.0, 13.0, -24.0, "South America (North)"],
+                     [-34.0, -59.0, 0.0, -24.0, "South America (East)"],
+                     [-34.0, -95.0, 0.0, -59.0, "South America (West)"],
+                     [-57.0, -95.0, -34.0, -24.0, "South America (South)"],
+                     [-56.0, 90.0, -13.0, 180.0, "Australia"],
+                     [-56.0, -180.0, 25.0, -95.0, "Pacific"],
+                     [-90.0, -180.0, -56.0, 180.0, "Antartica"],
+                     [83.0, -180.0, 90.0, 180.0, "Arctic"],
+                     # If this ever happens, identify the missing square, this line should never
+                     # happen to avoid controlling the GPX file against any country in the world.
+                     [-90.0, -180.0, 90.0, 180.0, "The World (Something is wrong further up)"]]
     for n in global_region:
-        sPoints = []
-        sPoints.append(([n[1], n[0]]))
-        sPoints.append(([n[3], n[0]]))
-        sPoints.append(([n[3], n[2]]))
-        sPoints.append(([n[1], n[2]]))
-        testOB = Polygon(sPoints)
-        if track.within(testOB) or track.intersects(testOB):
+        s_points = [([n[1], n[0]]),
+                    ([n[3], n[0]]),
+                    ([n[3], n[2]]),
+                    ([n[1], n[2]])]
+        test_obj = Polygon(s_points)
+        if track.within(test_obj) or track.intersects(test_obj):
             logger.debug("Found it in {0}!".format(n[4]))
             print "Found in {0}!".format(n[4])
-            minlon, minlat, maxlon, maxlat = testOB.bounds
-            result = gpx_loader.get_relations_in_bbox(minlat, minlon, maxlat, maxlon, 2)
+            min_lon, min_lat, max_lon, max_lat = test_obj.bounds
+            result = gpx_loader.get_relations_in_bbox(min_lat, min_lon, max_lat, max_lon, 2)
             break
 
 completed_ids = set()
@@ -177,10 +175,10 @@ try:
 except:
     pass
 tags = gpx_utils.remove_duplicates(tags)
-myTags = ", ".join(tags)
 bbox = [([track.bounds[1], track.bounds[0], track.bounds[3], track.bounds[2]])]
-myDescription = u"Track containing {0} trackpoints with a length of {2} km - bbox.{1}".format(trackptLength, bbox,
-                                                                                              trackLength)
-logger.info(myTags)
-gpx_uploader.upload_gpx(file, myTags, myDescription)
-logger.debug("Completed execution of %s\n\n\n", file)
+my_tags = ", ".join(tags)
+my_description = u"Track containing {0} trackpoints with a length of {2} km - bbox.{1}".format(track_pt_length, bbox,
+                                                                                               trackLength)
+logger.info(my_tags)
+gpx_uploader.upload_gpx(input_file, my_tags, my_description)
+logger.debug("Completed execution of %s\n\n\n", input_file)
