@@ -117,7 +117,7 @@ def get_relations_in_bbox(min_lat, min_long, max_lat, max_long, level=2):
     :param float max_lat: Max latitude
     :param float max_long: Max longitude
     :param int level: The administrative level boundaries to load.
-    :return: The shape returned.
+    :return []: The relations returned.
     """
     if min_lat == max_lat:
         __LOG.error(u'get_relations_in_bbox: Latitude %s equal %s - EXPANDING', str(min_lat), str(max_lat))
@@ -145,7 +145,20 @@ def get_relations_in_bbox(min_lat, min_long, max_lat, max_long, level=2):
         '  "name:en" = t["name:en"],' +
         '  "admin_level" = t["admin_level"];' +
         'out;')
-    return get_data(search_string)
+    return get_data(search_string)['elements']
+
+
+def get_relations_around_point(latitude, longitude, level=2):
+    search_string = (
+        '[out:json];' +
+        ('is_in(%s,%s);area._[admin_level=%d];' % (latitude, longitude, level)) +
+        'convert rel_info' +
+        '  ::id = id() - 3600000000,' +
+        '  "name" = t["name"],' +
+        '  "name:en" = t["name:en"],' +
+        '  "admin_level" = t["admin_level"];' +
+        'out;')
+    return get_data(search_string)['elements']
 
 
 def get_relations_in_object(obj_id, admin_level):
@@ -162,23 +175,17 @@ def get_relations_in_object(obj_id, admin_level):
         '  "name:en" = t["name:en"],' +
         '  "admin_level" = t["admin_level"];' +
         'out;')
-    return get_data(search_string)
+    return get_data(search_string)['elements']
 
 
 def get_geometry_for_relation(relation_id):
     """
     :param int relation_id: The relation ID.
     :param int level: The admin level.
-    :return: The geojson for the relation.
+    :return []: The geojson for the relation.
     """
-    # search_string = ('is_in;relation' +
-    #                  '["type"="boundary"]' +
-    #                  '["boundary"="administrative"]' +
-    #                  ('["admin_level"="%s"]' % level) +
-    #                  ('(%s);' % relation_id) +
-    #                  'out tags;')
     search_string = (
-        '[out:json][timeout:3600];' +
+        '[out:json][timeout:900];' +
         ('relation(%s);' % relation_id) +
         'way(r:"outer");' +
         'out geom;')

@@ -19,7 +19,7 @@ def upload_gpx(gpx_file, tags, description):
     """
     :param str gpx_file: GPX file to upload
     :param str tags: String tags to annotate with.
-    :param str description: Description of file content.
+    :param str|unicode description: Description of file content.
     :return:
     """
     user_name = os.environ.get('OSM_USER')

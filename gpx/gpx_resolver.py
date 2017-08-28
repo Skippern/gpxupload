@@ -112,7 +112,7 @@ class LinearResolver(GpxResolver):
         recurse_levels = levels[1:]
 
         relations = gpx_loader.get_relations_in_object(obj_id, next_level)
-        for rel in relations['elements']:
+        for rel in relations:
             try:
                 rel_id = rel['id']
                 rel_level = rel['tags']['admin_level']
@@ -248,7 +248,7 @@ class TreeResolver(GpxResolver):
                         raise Exception(u'Invalid self-level rule on level %s, must be True' % criteria)
                 elif criteria > region_level:
                     relations = gpx_loader.get_relations_in_object(region_id, criteria)
-                    for rel in relations['elements']:
+                    for rel in relations:
                         try:
                             rel_id = rel['id']
                             rel_level = rel['tags']['admin_level']

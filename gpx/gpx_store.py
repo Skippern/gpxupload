@@ -11,7 +11,6 @@ from shapely.geometry import Point, MultiPoint
 from shapely.geometry.base import BaseGeometry
 
 import gpx_utils
-from gpx_utils import BBox
 
 __LOG = logging.getLogger('gpx_store')
 
@@ -43,16 +42,12 @@ def load_gpx(filename):
         __LOG.error(u'Failed to read %s: %s' % (filename, e.message))
         raise e
 
-    lats = []
-    lons = []
     tracks = []
 
     for trk in root.findall('{http://www.topografix.com/GPX/1/1}trk'):
         for seg in trk.findall('{http://www.topografix.com/GPX/1/1}trkseg'):
             track_points = []
             for point in seg.findall('{http://www.topografix.com/GPX/1/1}trkpt'):
-                lats.append(float(point.get('lat')))
-                lons.append(float(point.get('lon')))
                 trk_pt = ([float(point.get('lon')), float(point.get('lat'))])
                 track_points.append(trk_pt)
             tracks.append(__mk_track(track_points))
@@ -61,16 +56,11 @@ def load_gpx(filename):
         for seg in trk.findall('{http://www.topografix.com/GPX/1/0}trkseg'):
             track_points = []
             for point in seg.findall('{http://www.topografix.com/GPX/1/0}trkpt'):
-                lats.append(float(point.get('lat')))
-                lons.append(float(point.get('lon')))
                 trk_pt = ([float(point.get('lon')), float(point.get('lat'))])
                 track_points.append(trk_pt)
             tracks.append(__mk_track(track_points))
 
-    lats.sort()
-    lons.sort()
-
-    return tracks, BBox(lats[0], lons[0], lats[-1], lons[-1])
+    return tracks
 
 
 def load_wkb(obj_id, admin_level, name=None):

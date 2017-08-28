@@ -4,6 +4,7 @@
 import logging
 
 import chardet
+from shapely.geometry import Point, MultiPoint
 
 __LOG = logging.getLogger('gpx_utils')
 __CODECS = ['ascii', 'iso-8859-2', 'iso-8859-1', 'iso-8859-3', 'iso-8859-4', 'iso-8859-5', 'iso-8859-6', 'iso-8859-7', 'iso-8859-8', 'iso-8859-9', 'iso-8859-10', 'iso-8859-11', 'iso-8859-12', 'iso-8859-13', 'iso-8859-14', 'iso-8859-15', 'iso-8859-16', 'mac-latin2', 'big5', 'cp037', 'cp1006', 'cp1026', 'cp1140', 'cp1250', 'cp1251', 'cp1252', 'cp1253', 'cp1254', 'cp1255', 'cp1256', 'cp1257', 'cp1258', 'cp424', 'cp437', 'cp500', 'cp720', 'cp737', 'cp755', 'cp850', 'cp852', 'cp855', 'cp856', 'cp857', 'cp858', 'cp860', 'cp861', 'cp862', 'cp863', 'cp864', 'cp865', 'cp866', 'cp869', 'cp874', 'cp875', 'cp932', 'cp949', 'cp950', 'euc_jis-2004', 'gb18030', 'gb2312', 'gbk', 'hp-roman8', 'mac_arabic', 'mac_centeuro', 'mac_croatian', 'mac_cyrillic', 'mac_farsi', 'mac_greek', 'mac_iceland', 'mac_roman', 'mac_romanian', 'mac_turkish', 'palmos', 'ptcp154', 'tis_620', 'mbcs', 'utf-8']
@@ -20,6 +21,15 @@ class BBox(object):
 
     def tuple(self):
         return self.min_lat, self.min_lon, self.max_lat, self.max_lon
+
+
+def bbox_for_track(track):
+    """
+    Get the bounding box for the track.
+    :param MultiPoint|Point track:
+    :return:
+    """
+    return BBox(track.bounds[0], track.bounds[1], track.bounds[2], track.bounds[3])
 
 
 def enforce_unicode(s):
@@ -110,13 +120,20 @@ def get_name(data):
     :return unicode: relation name
     """
     rel_id = data['id']
+    rel_name = None
     try:
-        rel_name = data['tags']['name']
+        rel_name = data['tags']['name:en']
     except KeyError:
+        pass
+
+    if rel_name is None or rel_name is '':
         try:
-            rel_name = data['tags']['name:en']
+            rel_name = data['tags']['name']
         except KeyError:
-            rel_name = str(rel_id)
+            pass
+    if rel_name is None or rel_name is '':
+        rel_name = str(rel_id)
+
     return enforce_unicode(rel_name)
 
 
