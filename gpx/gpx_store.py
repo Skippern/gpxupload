@@ -11,15 +11,28 @@ from shapely.geometry import Point, MultiPoint
 from shapely.geometry.base import BaseGeometry
 
 import gpx_utils
+from gpx_utils import BBox
 
 __LOG = logging.getLogger('gpx_store')
+
+
+def __mk_track(track_points):
+    if len(track_points) > 1:
+        return MultiPoint(track_points)
+    elif len(track_points) == 1:
+        return Point(track_points[0])
+    else:
+        __LOG.critical(u'Selected GPX have no valid track points')
+        print u'Selected GPX have no valid track points'
+        sys.exit(404)
 
 
 def load_gpx(filename):
     """
     :param filename: The file to load the track for.
-    :return Point|MultiPoint, []: The point or line read from the GPX track file.
-                                  And the bounding box as a 4-tuple.
+    :return [Point|MultiPoint], BBox:
+            The point or line read from the GPX track file.
+            And the bounding box as a 4-tuple.
     """
     __LOG.debug(u'Opening GPX file: %s' % filename)
     try:
@@ -32,38 +45,32 @@ def load_gpx(filename):
 
     lats = []
     lons = []
-    track_points = []
+    tracks = []
 
     for trk in root.findall('{http://www.topografix.com/GPX/1/1}trk'):
         for seg in trk.findall('{http://www.topografix.com/GPX/1/1}trkseg'):
+            track_points = []
             for point in seg.findall('{http://www.topografix.com/GPX/1/1}trkpt'):
                 lats.append(float(point.get('lat')))
                 lons.append(float(point.get('lon')))
                 trk_pt = ([float(point.get('lon')), float(point.get('lat'))])
                 track_points.append(trk_pt)
+            tracks.append(__mk_track(track_points))
+
     for trk in root.findall('{http://www.topografix.com/GPX/1/0}trk'):
         for seg in trk.findall('{http://www.topografix.com/GPX/1/0}trkseg'):
+            track_points = []
             for point in seg.findall('{http://www.topografix.com/GPX/1/0}trkpt'):
                 lats.append(float(point.get('lat')))
                 lons.append(float(point.get('lon')))
                 trk_pt = ([float(point.get('lon')), float(point.get('lat'))])
                 track_points.append(trk_pt)
-
-    if len(track_points) > 1:
-        track = MultiPoint(track_points)
-    elif len(track_points) == 1:
-        track = Point(track_points[0])
-    else:
-        __LOG.critical(u'Selected GPX have no valid track points')
-        print u'Selected GPX have no valid track points'
-        sys.exit(404)
+            tracks.append(__mk_track(track_points))
 
     lats.sort()
     lons.sort()
 
-    bbox = [lats[0], lons[0], lats[-1], lons[-1]]
-
-    return track, bbox
+    return tracks, BBox(lats[0], lons[0], lats[-1], lons[-1])
 
 
 def load_wkb(obj_id, admin_level, name=None):

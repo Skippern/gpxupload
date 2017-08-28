@@ -11,6 +11,17 @@ __DEBUGGING = False
 __NAME_LANGUAGES = ['en', 'no', 'pt']
 
 
+class BBox(object):
+    def __init__(self, min_lat, min_lon, max_lat, max_lon):
+        self.min_lat = min_lat
+        self.min_lon = min_lon
+        self.max_lat = max_lat
+        self.max_lon = max_lon
+
+    def tuple(self):
+        return self.min_lat, self.min_lon, self.max_lat, self.max_lon
+
+
 def enforce_unicode(s):
     """
     :param s:
