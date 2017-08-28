@@ -13,113 +13,6 @@ import gpx_utils
 __LOG = logging.getLogger('gpx_data')
 __1MD = gpx_utils.meter2deg(1.0)
 
-__DEBUGGING = False
-__NAME_LANGUAGES = ['en', 'no', 'pt']
-
-
-def get_name(data):
-    """
-    :param dict data: relation data
-    :return unicode: relation name
-    """
-    rel_id = data['id']
-    try:
-        rel_name = data['tags']['name']
-    except KeyError:
-        try:
-            rel_name = data['tags']['name:en']
-        except KeyError:
-            rel_name = str(rel_id)
-    return gpx_utils.enforce_unicode(rel_name)
-
-
-def get_tags(tags):
-    """
-    :param dict tags: Tags dictionary from overpass data response.
-    :return []: list of tags
-    """
-    out = []
-    if __DEBUGGING:
-        try:
-            out.append(gpx_utils.enforce_unicode(tags['admin_level']))
-        except KeyError:
-            pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['name']))
-    except KeyError:
-        pass
-
-    for lang in __NAME_LANGUAGES:
-        try:
-            out.append(gpx_utils.enforce_unicode(tags['name:%s' % lang]))
-        except KeyError:
-            pass
-        try:
-            out.append(gpx_utils.enforce_unicode(tags['official_name:%s' % lang]))
-        except KeyError:
-            pass
-        try:
-            out.append(gpx_utils.enforce_unicode(tags['alt_name:%s' % lang]))
-        except KeyError:
-            pass
-        try:
-            out.append(gpx_utils.enforce_unicode(tags['long_name:%s' % lang]))
-        except KeyError:
-            pass
-
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['official_name']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['short_name']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['long_name']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['alt_name']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['loc_name']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['old_name']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['ISO3166-1']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['ISO3166-1:alpha2']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['ISO3166-1:alpha3']))
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['ISO3166-2']))
-    except KeyError:
-        pass
-    try:
-        is_in_all = gpx_utils.enforce_unicode(tags['is_in'])
-        for is_in in is_in_all.split(';'):
-            out.append(is_in)
-    except KeyError:
-        pass
-    try:
-        out.append(gpx_utils.enforce_unicode(tags['is_in:continent']))
-    except KeyError:
-        pass
-
-    return out
-
 
 def geojson_to_geometry(data):
     """
@@ -211,7 +104,7 @@ def load_geo_shape(obj_id, admin_level, name):
 
     __LOG.info(u"Starting to build %s/%s: %s" % (admin_level, obj_id, name))
 
-    data = gpx_loader.get_geometry_for_relation(obj_id, admin_level)
+    data = gpx_loader.get_geometry_for_relation(obj_id)
     obj = geojson_to_geometry(data)
 
     gpx_store.store_wkb(obj, obj_id, admin_level)

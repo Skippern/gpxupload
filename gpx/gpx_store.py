@@ -167,6 +167,7 @@ def store_kml(obj, obj_id, admin_level=0, name='unknown'):
         d.append(p)
         fil = open(filename, 'w')
         fil.write(kf.to_string(prettyprint=True))
+        fil.flush()
         fil.close()
         __LOG.debug(u'store_kml: store successful (%s/%s) -> %s' % (admin_level, obj_id, filename))
     except Exception as e:

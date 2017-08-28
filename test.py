@@ -5,6 +5,8 @@ import json
 import logging
 import sys
 
+from shapely.geometry import MultiPolygon
+
 from gpx import gpx_data
 from gpx import gpx_loader
 from gpx import gpx_store
@@ -47,28 +49,87 @@ root.addHandler(ch)
 # track.BBOX((47.62998, 28.677306, 48.37961, 29.391003))
 
 
-#relation_id = 406567
-#level = 4
-relation_id = 305099
+relation_id = 0
 level = 2
+inner_level = 8
+name = u'Kiribati'
+fname = str(name).replace(" ", "_").lower()
+country_code = 'KI'
 
-# with open("out.json") as f:
-#    tmp = json.loads(f.read())
-#    tmp = gpx_data.to_geometry(tmp)
-#    print
-#    print "----------------------------------------"
-#    print
-#    print "Area: %s / %s" % (tmp.area, tmp.geom_type)
+if True:
+    tmp = gpx_loader.get_data(
+        '[out:json];'
+        'area' +
+        '["name:en"="' + str(name) + '"]' +
+        '["boundary"="administrative"]' +
+        '["admin_level"="2"];' +
+        'convert rel_info' +
+        '  ::id = id() - 3600000000,' +
+        '  "name" = t["name"],' +
+        '  "name:en" = t["name:en"],' +
+        '  "admin_level" = t["admin_level"];' +
+        'out;')
+
+    print json.dumps(tmp, sort_keys=True, indent=2)
+
+    relation_id  = tmp['elements'][0]['id']
+    name         = tmp['elements'][0]['tags']['name:en']
+    fname = str(name).replace(" ", "_").lower()
+
+    with open('out_%s.json' % fname, 'w') as f:
+        f.write(json.dumps(tmp, sort_keys=True, indent=2))
+        f.write('\n')
+        f.flush()
+
+area_id = relation_id + 3600000000
+
+
+if True:
+    tmp = gpx_loader.get_relations_in_object(relation_id, inner_level)
+    #tmp = gpx_loader.get_from_overpass(
+    #    '[out:json][timeout:900];' +
+    #    'relation' +
+    #    ('["admin_level"="%s"]' % inner_level) +
+    #    ('["is_in:country_code"="%s"]' % country_code) +
+    #    '["type"="boundary"]' +
+    #    '["boundary"="administrative"];' +
+    #    'out tags;', False, True)
+
+    with open('rels_%s.json' % fname, 'w') as f:
+        f.write(json.dumps(tmp, sort_keys=True, indent=2))
+        f.write('\n')
+        f.flush()
+    # data = gpx_loader.get_relations_in_object(relation_id, 3)
+    # print '--------------------------------------------------------------------'
+    # print
+    # print repr(data)
+    # print
+    # data = gpx_loader.get_relations_in_object(relation_id, 4)
+    # print '--------------------------------------------------------------------'
+    # print
+    # print repr(data)
+    # print
+
 
 # Test new geometry building!
-if True:
-    data = gpx_loader.get_geometry_for_relation(relation_id, level)
-    # with open('geom.json', 'r') as f:
-    #     data = json.loads(f.read())
-    with open('geom.json', 'w') as f:
-        f.write(json.dumps(data))
+if False:
+    data = None
+
+    data =  gpx_loader.get_geometry_for_relation(relation_id)
+    with open('geom_%s.json' % name, 'w') as f:
+        f.write(json.dumps(data, sort_keys=True, indent=2))
+        f.write('\n')
+        f.flush()
+
+    #with open('geom_%s_%s.json' % (fname, relation_id), 'r') as f:
+    #    data = json.loads(f.read())
+
     obj = gpx_data.geojson_to_geometry(data)
-    gpx_store.store_kml(obj, relation_id, level)
+    if isinstance(obj, MultiPolygon):
+        for i in range(0, len(obj)):
+            gpx_store.store_kml(obj[i], relation_id, level, fname + "_" + str(i))
+    else:
+        gpx_store.store_kml(obj, relation_id, level, fname)
 
 # tmp = gpx_loader.get_data(
 #    'relation' +
@@ -80,7 +141,9 @@ if True:
 
 if False:
     tmp = gpx_loader.get_relations_in_object(relation_id, level)
-    with open('geom.json', 'w') as f:
-        f.write(json.dumps(tmp))
+    with open('rel_%s.json' % fname, 'w') as f:
+        f.write(json.dumps(tmp, sort_keys=True, indent=2))
+        f.write('\n')
+        f.flush()
 
 # print repr(tmp)

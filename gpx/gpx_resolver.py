@@ -55,7 +55,7 @@ class CountryResolver(GpxResolver):
         country = gpx_data.load_geo_shape(self.id, 2, self.name)
         if gpx_utils.test_object(track, country):
             accepted = True
-            tags.extend(gpx_data.get_tags(country['tags']))
+            tags.extend(gpx_utils.get_tags(country['tags']))
         return accepted, tags
 
 
@@ -116,7 +116,7 @@ class LinearResolver(GpxResolver):
             try:
                 rel_id = rel['id']
                 rel_level = rel['tags']['admin_level']
-                rel_name = gpx_data.get_name(rel)
+                rel_name = gpx_utils.get_name(rel)
             except KeyError:
                 continue
 
@@ -129,7 +129,7 @@ class LinearResolver(GpxResolver):
                     if self.accept == rel_level:
                         accepted = True
 
-                    tags.extend(gpx_data.get_tags(region['tags']))
+                    tags.extend(gpx_utils.get_tags(region['tags']))
                     reg_accept, reg_tags = self.__test_recursive(track, rel_id, rel_level, recurse_levels)
                     if reg_accept:
                         accepted = True
@@ -155,7 +155,7 @@ class LinearResolver(GpxResolver):
         tags = []
         country = gpx_data.load_geo_shape(self.id, 2, self.name)
         if gpx_utils.test_object(track, country):
-            tags.extend(gpx_data.get_tags(country['tags']))
+            tags.extend(gpx_utils.get_tags(country['tags']))
             try:
                 accepted, rel_tags = self.__test_recursive(track, self.id, 2, self.levels)
             except Exception as e:
@@ -252,7 +252,7 @@ class TreeResolver(GpxResolver):
                         try:
                             rel_id = rel['id']
                             rel_level = rel['tags']['admin_level']
-                            rel_name = gpx_data.get_name(rel)
+                            rel_name = gpx_utils.get_name(rel)
                         except KeyError:
                             continue
                         if rel_level is not criteria:
@@ -282,8 +282,8 @@ class TreeResolver(GpxResolver):
         tags = []
         region = gpx_data.load_geo_shape(obj_id, obj_level, name)
         if gpx_utils.test_object(track, region):
-            tags.extend(gpx_data.get_tags(region['tags']))
-            rel_name = gpx_data.get_name(region)
+            tags.extend(gpx_utils.get_tags(region['tags']))
+            rel_name = gpx_utils.get_name(region)
             # Do the actual test for the region.
             accepted, rel_tags = self.__test_recursive(track, region, tree, rel_name)
             if accepted:
