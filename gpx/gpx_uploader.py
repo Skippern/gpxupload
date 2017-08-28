@@ -8,7 +8,7 @@ import requests
 
 import gpx_utils
 
-__LOG = logging.getLogger('gpx_store')
+__LOG = logging.getLogger('gpx_uploader')
 __ENABLE_UPLOAD = False
 __UPLOAD_FAILURE_DELAY = 60
 __UPLOAD_MAX_TRIES = 10
