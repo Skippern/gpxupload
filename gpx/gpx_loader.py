@@ -47,6 +47,7 @@ def get_from_overpass(search_string, geojson, last):
         if geojson:
             response_format = 'geojson'
         api = overpass.API(timeout=900, endpoint=__SERVER)
+        api.debug = False
         result = api.Get(search_string, responseformat=response_format, build=False)
         if result is not None:
             # print repr(result)
@@ -178,10 +179,27 @@ def get_relations_in_object(obj_id, admin_level):
     return get_data(search_string)['elements']
 
 
+def get_tags_for_relation(relation_id):
+    """
+    :param int relation_id:
+    :return dict: map of tags for relation.
+    """
+    area_id = relation_id + 3600000000
+    search_string = (
+        '[out:json];' +
+        ('area(%s);' % area_id) +
+        'out tags;')
+    result = get_data(search_string)
+    try:
+        return result['elements'][0]['tags']
+    except KeyError:
+        __LOG.error("No tags for relation %s" % relation_id)
+        return None
+
+
 def get_geometry_for_relation(relation_id):
     """
     :param int relation_id: The relation ID.
-    :param int level: The admin level.
     :return []: The geojson for the relation.
     """
     search_string = (

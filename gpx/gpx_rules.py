@@ -39,6 +39,12 @@ __NAME_RULES = dict({
     #          Americas          #
     ##############################
     u'Anguilla': Rule('country'),
+    u'Antigua and Barbuda': Rule('country'),
+    u'Argentina': Rule('linear', levels=[4, 5, 6, 7]),
+    u'Barbados': Rule('linear', levels=[6], accept=2),
+    u'Belize': Rule('linear', levels=[4]),
+    u'Bermuda': Rule('linear', levels=[6]),
+    u'Bolivia': Rule('linear', levels=[4, 6, 8]),
     u'Brazil': Rule('linear', levels=[4, 8]),
 
     ##############################
@@ -126,10 +132,10 @@ def __get_resolver(obj_id, obj_name):
     if obj_name in __NAME_RULES.keys():
         return __NAME_RULES[obj_name].create(obj_id, obj_name)
     elif obj_name is None:
-        __LOG.warn(u'Null country name: %s' % obj_id)
+        __LOG.error(u'Null country name: %s' % obj_id)
         return gpx_resolver.GpxResolver(obj_id, u'Unknown')
     else:
-        __LOG.warn(u'No rule for country: %s / %s, matching country only' % (obj_id, obj_name))
+        __LOG.error(u'No rule for country: %s / %s, matching country only' % (obj_id, obj_name))
         return gpx_resolver.CountryResolver(obj_id, obj_name)
 
 

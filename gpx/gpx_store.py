@@ -1,7 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import json
 import logging
+import os
 import sys
 from xml.etree import ElementTree
 
@@ -13,6 +15,30 @@ from shapely.geometry.base import BaseGeometry
 import gpx_utils
 
 __LOG = logging.getLogger('gpx_store')
+
+
+cache_dir = os.environ['HOME'] + '/.cache/gpx'
+
+
+def init_cache():
+    for i in range(2, 11):
+        for t in ['geos', 'tags', 'rels']:
+            d = '%s/%s/%s' % (cache_dir, t, i)
+            try:
+                os.makedirs(d)
+            except OSError:
+                pass
+
+
+def clear_cache(types = None):
+    if types is None:
+        types = ['geos', 'tags', 'rels']
+    init_cache()
+    for t in types:
+        for lvl in range(2, 11):
+            d = '%s/%s/%s' % (cache_dir, t, lvl)
+            for f in os.listdir(d):
+                os.remove('%s/%s' % (d, f))
 
 
 def __mk_track(track_points):
@@ -72,7 +98,7 @@ def load_wkb(obj_id, admin_level, name=None):
     :param str name: The name of the object if known.
     :return: The loaded shape.
     """
-    filename = './kml/%s/%s.wkb' % (admin_level, obj_id)
+    filename = '%s/geos/%s/%s.wkb' % (cache_dir, admin_level, obj_id)
 
     __LOG.debug(u'load_wkb: storing (%s/%s) -> %s' % (admin_level, obj_id, filename))
     try:
@@ -112,7 +138,7 @@ def load_wkb(obj_id, admin_level, name=None):
     return None
 
 
-def store_wkb(obj, obj_id, admin_level='2'):
+def store_wkb(obj, obj_id, admin_level):
     """
     Store a shape object in a way that makes it easy to reload and use for matching etc.
 
@@ -121,7 +147,7 @@ def store_wkb(obj, obj_id, admin_level='2'):
     :param int admin_level: The subdir (usually the administrative level)
     :return: None
     """
-    filename = './kml/%s/%s.wkb' % (admin_level, obj_id)
+    filename = '%s/geos/%s/%s.wkb' % (cache_dir, admin_level, obj_id)
 
     __LOG.info(u'store_wkb: storing a %s with size: %s ', obj.geom_type, obj.area)
     with open(filename, 'w') as out_file:
@@ -130,7 +156,43 @@ def store_wkb(obj, obj_id, admin_level='2'):
     __LOG.debug(u'store_wkb: store successful (%s/%s) -> %s' % (admin_level, obj_id, filename))
 
 
-def store_kml(obj, obj_id, admin_level=0, name='unknown'):
+def load_rels(obj_id, obj_level, admin_level):
+    filename = '%s/rels/%s/%s_%s.json' % (cache_dir, obj_level, obj_id, admin_level)
+    try:
+        with open(filename, 'r') as in_file:
+            return json.loads(in_file.read())
+    except IOError:
+        # no such file.
+        return None
+
+
+def store_rels(rels, obj_id, obj_level, admin_level):
+    filename = '%s/rels/%s/%s_%s.json' % (cache_dir, obj_level, obj_id, admin_level)
+    with open(filename, 'w') as out_file:
+        out_file.write(json.dumps(rels, sort_keys=True, indent=2))
+        out_file.write('\n')
+        out_file.flush()
+
+
+def load_tags(obj_id, admin_level):
+    filename = '%s/tags/%s/%s.json' % (cache_dir, admin_level, obj_id)
+    try:
+        with open(filename, 'r') as in_file:
+            return json.loads(in_file.read())
+    except IOError:
+        # no such file.
+        return None
+
+
+def store_tags(tags, obj_id, admin_level):
+    filename = '%s/tags/%s/%s.json' % (cache_dir, admin_level, obj_id)
+    with open(filename, 'w') as out_file:
+        out_file.write(json.dumps(tags, sort_keys=True, indent=2))
+        out_file.write('\n')
+        out_file.flush()
+
+
+def store_kml(obj, obj_id, admin_level, name='unknown'):
     """
     Store a shapely geometry object as a KML file.
 
