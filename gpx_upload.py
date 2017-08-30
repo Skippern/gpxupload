@@ -3,6 +3,7 @@
 #
 # Test the GPX File for coverage, so it is tagged correctly when uploaded
 
+import argparse
 import json
 import logging
 import sys
@@ -16,26 +17,31 @@ from gpx import gpx_store
 from gpx import gpx_uploader
 from gpx import gpx_utils
 
-##################
-# TODO: argparser
-##################
-log_file = '%s/GPXUploadEventLog.log' % gpx_store.cache_dir
-input_file = ""
+parser = argparse.ArgumentParser(description='Load and create a KML file')
+parser.add_argument('--cache_dir', metavar='DIR', type=str,
+                    help='Location of cache', default=gpx_store.cache_dir)
+parser.add_argument('--log_file', metavar='FILE', type=str,
+                    help='Output log file', default=None)
+parser.add_argument('input_file', type=int, help='relation ID of object')
 
-if len(sys.argv) < 2:
-    print "Usage: gpxtest.py <GPX file>"
-    sys.exit(0)
-else:
-    input_file = sys.argv[1]
+args = parser.parse_args()
+
+if 'cache_dir' in args:
+    gpx_store.cache_dir = args.cache_dir
+
+log_file = '%s/GPXUploadEventLog.log' % gpx_store.cache_dir
+if 'log_file' in args:
+    log_file = args.log_file
+logging.basicConfig(filename=log_file, level=logging.DEBUG,
+                    format="%(asctime)s %(name)s %(levelname)s - %(message)s", datefmt="%Y/%m/%d %H:%M:%S:")
+
+
+__LOG = logging.getLogger("gpxupload")
+__LOG.info("\n\n\nSTARTING: %s\n\n" % args.input_file)
 
 
 gpx_store.init_cache()
 
-
-logging.basicConfig(filename=log_file, level=logging.DEBUG,
-                    format="%(asctime)s %(name)s %(levelname)s - %(message)s", datefmt="%Y/%m/%d %H:%M:%S:")
-__LOG = logging.getLogger("gpxupload")
-__LOG.info("\n\n\nSTARTING: %s\n\n" % input_file)
 
 if speedups.available:
     speedups.enable()
@@ -45,7 +51,7 @@ else:
 
 tags = []
 
-tracks = gpx_store.load_gpx(input_file)
+tracks = gpx_store.load_gpx(args.input_file)
 track_pt_length = 0
 trackLength = 0.0
 
@@ -98,6 +104,6 @@ my_description = u"Track file containing {0} segments with a {1} points".format(
 
 __LOG.info("TAGS: " + my_tags)
 
-gpx_uploader.upload_gpx(input_file, my_tags, my_description)
+gpx_uploader.upload_gpx(args.input_file, my_tags, my_description)
 
-__LOG.debug("Completed execution of %s\n\n\n", input_file)
+__LOG.debug("\n\n\nCompleted execution of %s\n\n", args.input_file)
