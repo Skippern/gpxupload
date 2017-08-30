@@ -24,5 +24,12 @@ gpx_store.init_cache()
 
 
 tags = gpx_data.load_tags(args.obj_id, args.obj_level)
-geos = gpx_data.load_geo_shape(args.obj_id, args.obj_level, gpx_utils.get_name(tags))
-gpx_store.store_kml(geos, args.obj_id, args.obj_level, gpx_utils.get_name(tags))
+
+name = str(args.obj_id)
+if 'name:en' in tags:
+    name = tags['name:en']
+else:
+    name = tags['name']
+
+geos = gpx_data.load_geo_shape(args.obj_id, args.obj_level, name)
+gpx_store.store_kml(geos, args.obj_id, args.obj_level, name)
