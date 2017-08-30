@@ -4,10 +4,12 @@
 # Test the GPX File for coverage, so it is tagged correctly when uploaded
 
 import argparse
+import logging
 
 from gpx import gpx_data
 from gpx import gpx_store
-from gpx import gpx_utils
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 parser = argparse.ArgumentParser(description='Load and create a KML file')
 parser.add_argument('--cache_dir', metavar='DIR', type=str,

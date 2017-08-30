@@ -192,7 +192,7 @@ def store_tags(tags, obj_id, admin_level):
         out_file.flush()
 
 
-def store_kml(obj, obj_id, admin_level, name='unknown'):
+def store_kml(obj, obj_id, admin_level, name=u'unknown'):
     """
     Store a shapely geometry object as a KML file.
 
@@ -202,10 +202,8 @@ def store_kml(obj, obj_id, admin_level, name='unknown'):
     :param str|unicode name: Name of the region to store in KML.
     :return:
     """
-    name = gpx_utils.enforce_unicode(name).encode('ascii', 'replace')
-    filename = './%s_%s.kml' % (name.replace(' ', '_'), obj_id)
-    # filename = './kml/%s/%s.kml' % (admin_level, obj_id)
-
+    ascii_name = gpx_utils.enforce_unicode(name).encode('ascii', 'replace')
+    filename = './%s_%s.kml' % (ascii_name.replace(' ', '_'), obj_id)
     __LOG.info(u'store_kml: storing a %s with size: %s ', obj.geom_type, obj.area)
     try:
         ns = '{http://www.opengis.net/kml/2.2}'
@@ -217,11 +215,11 @@ def store_kml(obj, obj_id, admin_level, name='unknown'):
         if obj.geom_type == 'LineString' or obj.geom_type == 'MultiLineString' or obj.geom_type == 'LinearRing':
             d = kml.Document(ns, str(obj_id), 'Traces', 'GPX Visualization')
         elif obj.geom_type == 'Polygon' or obj.geom_type == 'MultiPolygon':
-            d = kml.Document(ns, str(obj_id), 'Border of {0} ({1})'.format(name, obj_id), 'Border visualization')
+            d = kml.Document(ns, str(obj_id), 'Border of {0} ({1})'.format(ascii_name, obj_id), 'Border visualization')
         else:
             d = kml.Document(ns, str(obj_id), 'Points', 'Point visualization')
         kf.append(d)
-        p = kml.Placemark(ns, str(obj_id), name, '{0}'.format(name), styles=[style])
+        p = kml.Placemark(ns, str(obj_id), ascii_name, '{0}'.format(ascii_name), styles=[style])
         p.geometry = obj
         d.append(p)
         fil = open(filename, 'w')
