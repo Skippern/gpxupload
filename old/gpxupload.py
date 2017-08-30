@@ -47,7 +47,7 @@ else:
     logger.debug("Speedups not enabled, executing default\n")
 
 no_upload = True
-absolutely_no_upload = True
+absolutely_no_upload = False
 latinize = False
 no_kml = True
 no_svg = True
