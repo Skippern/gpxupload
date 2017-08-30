@@ -5,3 +5,4 @@ overpass
 numpy
 fastkml
 unidecode
+pytest
