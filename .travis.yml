@@ -1,5 +1,6 @@
 {
   "language": "python",
+  "install": "pip install -r dependencies.txt",
   "dist": "trusty",
   "sudo": "false",
   "script": "py.test -v"
