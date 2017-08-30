@@ -46,6 +46,11 @@ __NAME_RULES = dict({
     u'Bermuda': Rule('linear', levels=[6]),
     u'Bolivia': Rule('linear', levels=[4, 6, 8]),
     u'Brazil': Rule('linear', levels=[4, 8]),
+    u'Trinidad and Tobago', Rule('country'),
+    u'Turks and Caicos Islands': Rule('linear', levels[6]),
+    #u'United States of America'
+    u'Uruguay': Rule('linear', levels[4, 6]),
+    u'Venezuela': Rule('linear', levels[4, 6]),
 
     ##############################
     #           Europe           #
@@ -85,10 +90,19 @@ __NAME_RULES = dict({
     # --- ETC ---
 
     u'Norway': Rule('linear', levels=[4, 7]),
+    u'Ukraine': Rule('linear', levels=[4, 6]),
+    u'United Kingdom': Rule('tree', tree={4: {
+                            u'Northern Ireland': {10: True}, # TODO historic admin_level 5 + 6
+                            u'England': {5: {6: True, 8: True}},
+                            6: True}),
+    u'Vatican City': Rule('country'),
 
     ##############################
     #     Sub-Saharan Africa     #
     ##############################
+    u'Uganda': Rule('linear', levels=[3, 4]),
+    u'Zambia': Rule('linear', levels[4]),
+    u'Zimbabwe': Rule('linear', levels[4,6]),
 
     ##############################
     # North-Africa & Middle East #
@@ -112,14 +126,25 @@ __NAME_RULES = dict({
     # South-Sudan -> Sub-Saharan Africa
     u'Bahrain': Rule('linear', levels=[4]),
     u'Kuwait': Rule('linear', levels=[4]),
+    u'Tunisia': Rule('linear', levels=[8]),
+    u'United Arab Emirates', Rule('linear', levels=[4]),
+    u'Yemen': Rule('linear', levels=[4]),
 
     ##############################
     #            Asia            #
     ##############################
+    u'Turkey': Rule('linear', levels[3, 4, 6]),
+    u'Turkmenistan': Rule('linear', levels[8]),
+    u'Uzbekistan': Rule('tree',
+                        tree={4: True, {6: True, 8: True}}),
+    u'Vietnam': Rule('linear', levels=[4]),
 
     ##############################
     #    Australia & Oceania     #
     ##############################
+    u'Tokelau': Rule('country'),
+    u'Tuvalu': Rule('linear', levels=[8]),
+    u'Vanuaty': Rule('linear', levels=[4]),
 })
 
 
