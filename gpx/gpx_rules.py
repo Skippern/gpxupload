@@ -47,7 +47,7 @@ __NAME_RULES = dict({
     u'Bolivia': Rule('linear', levels=[4, 6, 8]),
     u'Brazil': Rule('linear', levels=[4, 8]),
     u'British Virgin Islands': Rule('country'),
-    u'Canada': Rule('tree', tree{ 4: {
+    u'Canada': Rule('tree', tree={ 4: {
                     u'Alberta': {6: True, 8: True},
                     u'Manitoba': {6: True, 8: True},
                     u'Ontario': {6: True, 8: True},
