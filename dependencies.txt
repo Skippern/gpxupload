@@ -6,3 +6,4 @@ numpy
 fastkml
 unidecode
 pytest
+PyYAML
