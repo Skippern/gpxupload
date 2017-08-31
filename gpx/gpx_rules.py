@@ -323,7 +323,7 @@ __NAME_RULES = dict({
     u'Tonga': Rule('treet', tree={3: {5: True, 7: True}, 4: { 4: True, 5: True}}),
     u'Tokelau': Rule('country'),
     u'Tuvalu': Rule('linear', levels=[8]),
-    u'Vanuaty': Rule('linear', levels=[4]),
+    u'Vanuatu': Rule('linear', levels=[4]),
 })
 
 
