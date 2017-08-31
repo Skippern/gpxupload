@@ -324,7 +324,7 @@ __NAME_RULES = dict({
     u'Tokelau': Rule('country'),
     u'Tuvalu': Rule('linear', levels=[8]),
     u'Vanuaty': Rule('linear', levels=[4]),
-}),
+})
 
 
 def __get_resolver(obj_id, obj_name):
