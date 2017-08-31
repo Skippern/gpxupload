@@ -287,7 +287,7 @@ __NAME_RULES = dict({
     u'Nepal': Rule('linear', levels=[4, 5, 6, 8]),
     u'North Korea': Rule('tree', tree={4: True, 6: True, 8: True}),
     u'Pakistan': Rule('tree', tree={4: {6: True, 8: True}}),
-    u'Philippines': Rule('tree', tree={3: { u'Metro Manila': {6: True}, 4: {4: True, {6: True, 7: True}}}}),
+    u'Philippines': Rule('tree', tree={3: { u'Metro Manila': {6: True}, 4: {4: True, 6: True, 7: True}}}),
     u'Singapore': Rule('linear', levels=[6]),
     u'South Korea': Rule('linear', levels=[4, 6, 8], accept=6),
     u'Sri Lanka': Rule('tree', tree={4: {5: {6: {7: True}}, 8: True}}),
