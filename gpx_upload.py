@@ -6,7 +6,6 @@
 import argparse
 import json
 import logging
-import sys
 
 from shapely import speedups
 from shapely.geometry import LineString, Point, MultiPoint
@@ -17,31 +16,45 @@ from gpx import gpx_store
 from gpx import gpx_uploader
 from gpx import gpx_utils
 
+config = gpx_utils.load_config()
+
 parser = argparse.ArgumentParser(description='Load and create a KML file')
 parser.add_argument('--cache_dir', metavar='DIR', type=str,
-                    help='Location of cache', default=gpx_store.cache_dir)
+                    help='Location of cache', default=argparse.SUPPRESS)
 parser.add_argument('--log_file', metavar='FILE', type=str,
-                    help='Output log file', default=None)
-parser.add_argument('input_file', type=int, help='relation ID of object')
+                    help='Output log file', default=argparse.SUPPRESS)
+parser.add_argument('--dry_run', action='store_true',
+                    help='No not upload result', default=False)
+parser.add_argument('input_file', type=str, help='relation ID of object')
 
 args = parser.parse_args()
 
 if 'cache_dir' in args:
     gpx_store.cache_dir = args.cache_dir
+else:
+    gpx_store.cache_dir = config['cache_dir']
 
 log_file = '%s/GPXUploadEventLog.log' % gpx_store.cache_dir
 if 'log_file' in args:
     log_file = args.log_file
+elif 'log_file' in config:
+    log_file = config['log_file']
+
+gpx_loader.overpass_server = config['overpass_server']
+
 logging.basicConfig(filename=log_file, level=logging.DEBUG,
                     format="%(asctime)s %(name)s %(levelname)s - %(message)s", datefmt="%Y/%m/%d %H:%M:%S:")
 
-
-__LOG = logging.getLogger("gpxupload")
-__LOG.info("\n\n\nSTARTING: %s\n\n" % args.input_file)
-
-
 gpx_store.init_cache()
 
+__LOG = logging.getLogger("gpxupload")
+
+
+#######################
+#  Start the program  #
+#######################
+
+__LOG.info("\n\n\nSTARTING: %s\n\n" % args.input_file)
 
 if speedups.available:
     speedups.enable()
@@ -91,11 +104,6 @@ for track in tracks:
 
     tags.sort()
     tags = gpx_utils.remove_duplicates(tags)
-    print json.dumps(tags, sort_keys=True, indent=2)
-
-
-if True:
-    sys.exit(0)
 
 
 my_tags = ", ".join(tags)
@@ -104,6 +112,7 @@ my_description = u"Track file containing {0} segments with a {1} points".format(
 
 __LOG.info("TAGS: " + my_tags)
 
-gpx_uploader.upload_gpx(args.input_file, my_tags, my_description)
+if config['enable_upload'] and not args.dry_run:
+    gpx_uploader.upload_gpx(args.input_file, my_tags, my_description)
 
 __LOG.debug("\n\n\nCompleted execution of %s\n\n", args.input_file)

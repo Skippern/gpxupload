@@ -22,7 +22,7 @@ __LOG = logging.getLogger("gpx_loader")
 # __SERVERS.append('http://overpass.openstreetmap.ie/api/')
 
 # __SERVER = random.choice(__SERVERS)
-__SERVER = 'http://overpass-api.de/api/interpreter'
+overpass_server = 'http://overpass-api.de/api/interpreter'
 
 # Delay between each retry on 'normal' failures.
 __OVERPASS_RETRY_DELAY = 10
@@ -46,7 +46,7 @@ def get_from_overpass(search_string, geojson, last):
         response_format = 'json'
         if geojson:
             response_format = 'geojson'
-        api = overpass.API(timeout=900, endpoint=__SERVER)
+        api = overpass.API(timeout=900, endpoint=overpass_server)
         api.debug = False
         result = api.Get(search_string, responseformat=response_format, build=False)
         if result is not None:
