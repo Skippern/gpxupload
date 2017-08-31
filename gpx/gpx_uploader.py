@@ -9,7 +9,6 @@ import requests
 import gpx_utils
 
 __LOG = logging.getLogger('gpx_uploader')
-__ENABLE_UPLOAD = False
 __UPLOAD_FAILURE_DELAY = 60
 __UPLOAD_MAX_TRIES = 10
 __TRACK_VISIBILITY = u'public'  # public, private, trackable, identifiable
@@ -39,12 +38,6 @@ def upload_gpx(gpx_file, tags, description):
     send_tags = gpx_utils.enforce_unicode(tags.replace('.', '_'))
 
     payload = {u'description': description, u'tags': send_tags, u'visibility': __TRACK_VISIBILITY}
-
-    if not __ENABLE_UPLOAD:
-        __LOG.debug(u'Upload disabled!')
-        print repr(payload)
-        sys.exit(3)
-
     payload = json.loads(json.dumps(payload))
     try:
         url = 'http://www.openstreetmap.org/api/0.6/gpx/create'
