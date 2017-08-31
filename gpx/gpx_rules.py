@@ -254,7 +254,7 @@ __NAME_RULES = dict({
     u'Qatar': Rule('linear', levels=[4]),
     u'Sharawi Arab Democratic Republic': Rule('country'),
     u'Saudi Arabia': Rule('linear', levels=[4]),
-    u'Somalia': Rule('tree', tree={3: True, {4: {6: True}}}),
+    u'Somalia': Rule('tree', tree={3: { 3: True, 4: {6: True}}}),
     u'Sudan': Rule('linear', levels=[4, 8], accept=4),
     u'Syria': Rule('linear', levels=[4]),
     u'Turkey': Rule('linear', levels=[3, 4, 6]),
@@ -295,7 +295,7 @@ __NAME_RULES = dict({
     u'Tajikistan': Rule('linear', levels=[4, 6]),
     u'Thailand': Rule('linear', levels=[4, 6], accept=4),
     u'Turkmenistan': Rule('linear', levels=[8]),
-    u'Uzbekistan': Rule('tree', tree={4: True, {6: True, 8: True}}),
+    u'Uzbekistan': Rule('tree', tree={4: {4: True, 6: True, 8: True}}),
     u'Vietnam': Rule('linear', levels=[4]),
 
     ##############################
