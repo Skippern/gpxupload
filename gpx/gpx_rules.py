@@ -299,7 +299,7 @@ __NAME_RULES = dict({
     u'Vietnam': Rule('linear', levels=[4]),
 
     ##############################
-    #    Australia & Oceania     #
+    #    Australia & Oceania     # 
     ##############################
     u'Australia': Rule('tree', tree={4: {
                        u'Victoria': {5: {6: {7: True}}},
