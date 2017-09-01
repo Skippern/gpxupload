@@ -121,20 +121,15 @@ def get_name(data):
     :param dict data: relation data
     :return unicode: relation name
     """
-    rel_id = data['id']
     rel_name = None
     try:
         rel_name = data['tags']['name:en']
     except KeyError:
+        # Some does not have separate english and native name.
         pass
 
     if rel_name is None or rel_name is '':
-        try:
-            rel_name = data['tags']['name']
-        except KeyError:
-            pass
-    if rel_name is None or rel_name is '':
-        rel_name = str(rel_id)
+        rel_name = data['tags']['name']
 
     return enforce_unicode(rel_name)
 

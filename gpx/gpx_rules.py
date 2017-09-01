@@ -339,11 +339,9 @@ def __get_resolver(obj_id, obj_name):
     if obj_name in __NAME_RULES.keys():
         return __NAME_RULES[obj_name].create(obj_id, obj_name)
     elif obj_name is None:
-        __LOG.error(u'Null country name: %s' % obj_id)
-        return gpx_resolver.GpxResolver(obj_id, u'Unknown')
+        raise Exception(u'Null country name: %s' % obj_id)
     else:
-        __LOG.error(u'No rule for country: %s / %s, matching country only' % (obj_id, obj_name))
-        return gpx_resolver.CountryResolver(obj_id, obj_name)
+        raise Exception(u'No rule for country: %s / %s' % (obj_id, obj_name))
 
 
 def test_country(track, country_obj_id, country_name):

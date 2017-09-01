@@ -100,7 +100,6 @@ class LinearResolver(GpxResolver):
         accepted = False
         tags = []
         if len(levels) == 0:
-            self._LOG.info("Nothing more to test...")
             return True, tags
         if obj_level is self.accept:
             accepted = True
@@ -110,21 +109,16 @@ class LinearResolver(GpxResolver):
 
         relations = gpx_data.load_relations(obj_id, obj_level, next_level)
         for rel in relations:
-            try:
-                rel_id = rel['id']
-                rel_level = int(rel['tags']['admin_level'])
-                rel_name = gpx_utils.get_name(rel)
-            except KeyError as e:
-                self._LOG.error(u"Woops: %s" % e.message)
-                continue
+            rel_id = rel['id']
+            rel_level = int(rel['tags']['admin_level'])
+            rel_name = gpx_utils.get_name(rel)
 
             if rel_level is not next_level:
-                self._LOG.warn(u"Relation level mismatch: %s != %s for %s" % (rel_level, next_level, rel_name))
+                raise AssertionError(u"Relation level mismatch: %s != %s for %s" % (rel_level, next_level, rel_name))
 
             region = gpx_data.load_geo_shape(rel_id, rel_level, rel_name)
             if region is None:
-                self._LOG.error(u"Loaded None region for: %s" % rel_name)
-                continue
+                raise AssertionError(u"Loaded None region for: %s" % rel_name)
 
             if gpx_utils.test_object(track, region):
                 r_tags = gpx_data.load_tags(rel_id, rel_level)
@@ -135,8 +129,8 @@ class LinearResolver(GpxResolver):
                     tags.extend(reg_tags)
 
                 if not accepted:
-                    raise Exception(u'Region matched, but not accepted: (%s/%s) %s' %
-                                    (rel_level, rel_id, rel_name))
+                    raise AssertionError(u'Region matched, but not accepted: (%s/%s) %s' %
+                                         (rel_level, rel_id, rel_name))
         if not accepted:
             tags = []
         return accepted, tags
@@ -155,15 +149,11 @@ class LinearResolver(GpxResolver):
         if gpx_utils.test_object(track, country):
             c_tags = gpx_data.load_tags(self.id, 2)
             tags.extend(gpx_utils.get_tags(c_tags))
-            try:
-                accepted, rel_tags = self.__test_recursive(track, self.id, 2, self.levels)
-            except Exception as e:
-                raise e
-                # raise Exception(u'Error matching %s: %s' % (self.name, e.message))
+            accepted, rel_tags = self.__test_recursive(track, self.id, 2, self.levels)
             if accepted:
                 tags.extend(rel_tags)
             else:
-                raise Exception(u'Country matched but not accepted: %s, levels=%s' % (self.name, self.levels))
+                raise AssertionError(u'Country matched but not accepted: %s, levels=%s' % (self.name, self.levels))
         return accepted, tags
 
 
@@ -206,7 +196,7 @@ class TreeResolver(GpxResolver):
         """
         super(TreeResolver, self).__init__(obj_id, name)
         if tree is None:
-            raise Exception(u'TreeRule for %s (%s) has no tree' % (name, obj_id))
+            raise AssertionError(u'TreeRule for %s (%s) has no tree' % (name, obj_id))
         self.tree = tree
 
     def __test_recursive(self, track, region, tree, name):
@@ -228,11 +218,8 @@ class TreeResolver(GpxResolver):
         if name in tree.keys():
             return self.__test_recursive(track, region, tree[name], name)
 
-        try:
-            region_id = region['id']
-            region_level = region['tags']['admin_level']
-        except KeyError:
-            return False, []
+        region_id = region['id']
+        region_level = region['tags']['admin_level']
 
         accepted = False
         tags = []
@@ -245,7 +232,7 @@ class TreeResolver(GpxResolver):
                     if rule is True:
                         accepted = True
                     else:
-                        raise Exception(u'Invalid self-level rule on level %s, must be True' % criteria_level)
+                        raise AssertionError(u'Invalid self-level rule on level %s, must be True' % criteria_level)
                 elif criteria_level > region_level:
                     relations = gpx_data.load_relations(region_id, region_level, criteria_level)
                     for rel in relations:
@@ -261,11 +248,11 @@ class TreeResolver(GpxResolver):
                         rel_ok, rel_tags = self.__test_tree_recursive(
                                 track, rel_id, rel_level, tree[criteria_level], rel_name)
                         if rel_ok:
+                            accepted = True
                             tags.extend(rel_tags)
                 else:
-                    # continue / ignore rule?
-                    raise Exception(u'Criteria level below region level (%s < %s)' %
-                                    (criteria_level, region_level))
+                    raise AssertionError(u'Criteria level below region level (%s < %s)' %
+                                         (criteria_level, region_level))
 
         return accepted, tags
 
@@ -290,8 +277,10 @@ class TreeResolver(GpxResolver):
             if accepted:
                 tags.extend(rel_tags)
             else:
-                raise Exception(u'Region matched, but not accepted: (%s/%s) %s' %
-                                (obj_level, obj_id, name))
+                if obj_level is 2:
+                    raise AssertionError(u'Country %s matched but not accepted' % name)
+                self._LOG.warn(u'Region matched, but not accepted: (%s/%s) %s' %
+                               (obj_level, obj_id, name))
         return accepted, tags
 
     def test(self, track):
@@ -302,8 +291,4 @@ class TreeResolver(GpxResolver):
         :return (bool, []): If the resolution did find / match the region, and a list of tags
                             associated with that region.
         """
-        try:
-            return self.__test_tree_recursive(track, self.id, 2, self.tree, self.name)
-        except Exception as e:
-            self._LOG.error(u'Failed in %s: %s' % (self.name, e.message))
-            raise e
+        return self.__test_tree_recursive(track, self.id, 2, self.tree, self.name)

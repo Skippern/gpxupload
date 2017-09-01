@@ -60,9 +60,6 @@ def get_from_overpass(search_string, geojson, last):
                     __LOG.debug(u'__get_from_overpass: json in get_data contains empty ["elements"]!')
             return result
         __LOG.error(u'__get_from_overpass: API returned None')
-    except overpass.errors.OverpassSyntaxError as e:
-        __LOG.fatal(u'__get_from_overpass: OverpassSyntaxError: %s' % e.request)
-        raise
     except overpass.errors.ServerRuntimeError as e:
         __LOG.error(u'__get_from_overpass: ServerRuntimeError: %s' % e.message)
     except overpass.errors.UnknownOverpassError as e:
@@ -87,9 +84,7 @@ def get_from_overpass(search_string, geojson, last):
         __LOG.fatal(u'__get_from_overpass: json in get_data does not contain ["elements"]: %s' % e.message)
         raise
 
-    if last:
-        raise
-    else:
+    if not last:
         __LOG.debug(u'__get_from_overpass: Waiting for retry in %s seconds' % delay)
         time.sleep(delay)
     return None
@@ -193,8 +188,7 @@ def get_tags_for_relation(relation_id):
     try:
         return result['elements'][0]['tags']
     except KeyError:
-        __LOG.error("No tags for relation %s" % relation_id)
-        return None
+        raise AssertionError(u"No tags for relation %s" % relation_id)
 
 
 def get_geometry_for_relation(relation_id):
