@@ -199,13 +199,15 @@ class TreeResolver(GpxResolver):
             raise AssertionError(u'TreeRule for %s (%s) has no tree' % (name, obj_id))
         self.tree = tree
 
-    def __test_recursive(self, track, region, tree, name):
+    def __test_recursive(self, track, region, tree, region_id, region_level, name):
         """
         This object has already matched the region.
 
         :param track: The track to test.
-        :param dict region: The rules to test.
+        :param region: The rules to test.
         :param bool|dict tree: The rules for handling the region.
+        :param int region_id: The region ID to test.
+        :param int region_level: The region level to test.
         :param unicode name: The region name.
         :return (bool, []): True if accepted and list of tags.
         """
@@ -216,10 +218,7 @@ class TreeResolver(GpxResolver):
 
         # A name rule replaces the current rule.
         if name in tree.keys():
-            return self.__test_recursive(track, region, tree[name], name)
-
-        region_id = region['id']
-        region_level = region['tags']['admin_level']
+            return self.__test_recursive(track, region, tree[name], region_id, region_level, name)
 
         accepted = False
         tags = []
@@ -269,9 +268,8 @@ class TreeResolver(GpxResolver):
         if gpx_utils.test_object(track, region):
             c_tags = gpx_data.load_tags(obj_id, obj_level)
             tags.extend(gpx_utils.get_tags(c_tags))
-            rel_name = gpx_utils.get_name(c_tags)
             # Do the actual test for the region.
-            accepted, rel_tags = self.__test_recursive(track, region, tree, rel_name)
+            accepted, rel_tags = self.__test_recursive(track, region, tree, obj_id, obj_level, name)
             if accepted:
                 tags.extend(rel_tags)
             else:
