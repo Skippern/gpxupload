@@ -158,7 +158,7 @@ class LinearResolver(GpxResolver):
 
 
 class TreeResolver(GpxResolver):
-    def __init__(self, obj_id, name, tree=None):
+    def __init__(self, obj_id, name, tree):
         """
         The rules are as follows. For each level checked, you have three
         types of criteria, which will be tested in order:

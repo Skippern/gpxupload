@@ -31,7 +31,7 @@ def bbox_for_track(track):
     :param MultiPoint|Point track:
     :return:
     """
-    return BBox(track.bounds[0], track.bounds[1], track.bounds[2], track.bounds[3])
+    return BBox(track.bounds[1], track.bounds[0], track.bounds[3], track.bounds[2])
 
 
 def enforce_unicode(s):

@@ -14,7 +14,7 @@ __LOG = logging.getLogger('gpx_data')
 __1MD = gpx_utils.meter2deg(1.0)
 
 
-def geojson_to_geometry(data):
+def geojson_to_geometry(data, name):
     """
     NOTE: Incomplete and buggy!
 
@@ -56,7 +56,7 @@ def geojson_to_geometry(data):
         if merged_line.is_ring or isinstance(merged_line, MultiLineString) or isinstance(merged_line, LineString):
             polygons.append(merged_line.buffer(__1MD))
         else:
-            raise "Unknown linemerge result: %s" % repr(merged_line)
+            raise AssertionError(u"Unknown linemerge result: %s, %s" % (repr(merged_line), name))
     elif len(lines) == 1:
         # or ? polygons.append(Polygon(lines[0].buffer(__1MD)))
         polygons.append(lines[0].buffer(__1MD))
@@ -66,7 +66,7 @@ def geojson_to_geometry(data):
         try:
             polygons.append(Polygon(ring).buffer(__1MD))
         except Exception as e:
-            __LOG.error("Unable to make polygon from ring: " % e.message)
+            __LOG.error("Unable to make polygon from ring: %s, %s" % (e.message, name))
             # but continue
 
     # Merge all the polygons!!!!
@@ -81,10 +81,10 @@ def geojson_to_geometry(data):
     elif isinstance(shape, Polygon):
         shape = Polygon(shape.exterior).buffer(__1MD)
     else:
-        raise Exception("Unknown polygon type: %s" % shape.type)
+        raise Exception("Unknown polygon type: %s, %s" % (shape.type, name))
 
     if shape.area == 0.0:
-        raise AssertionError(u'Created shape with area 0')
+        raise AssertionError(u'Created shape with area 0 for %s' % name)
 
     return shape
 
@@ -105,7 +105,7 @@ def load_geo_shape(obj_id, admin_level, name):
     __LOG.info(u"Starting to build %s/%s: %s" % (admin_level, obj_id, name))
 
     data = gpx_loader.get_geometry_for_relation(obj_id)
-    obj = geojson_to_geometry(data)
+    obj = geojson_to_geometry(data, name)
 
     gpx_store.store_wkb(obj, obj_id, admin_level)
     return obj
