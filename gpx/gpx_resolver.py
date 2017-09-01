@@ -222,7 +222,7 @@ class TreeResolver(GpxResolver):
 
         accepted = False
         tags = []
-        for criteria_level, rule in tree:
+        for criteria_level, rule in tree.iteritems():
             if isinstance(criteria_level, int):
                 if criteria_level is region_level:
                     # If the rule has the same admin level as the current region,
