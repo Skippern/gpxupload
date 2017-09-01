@@ -41,7 +41,7 @@ def upload_gpx(gpx_file, tags, description):
 
         # truly not what it says it is, but to enforce correct multi-part form data.
         files = (
-            ('file', open(gpx_file, 'rb')),
+            ('file', open(gpx_file, 'rb').read()),
             ('description', description),
             ('tags', send_tags),
             ('visibility', __TRACK_VISIBILITY))
