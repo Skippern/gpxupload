@@ -97,9 +97,9 @@ for track in tracks:
     print json.dumps(countries, sort_keys=True, indent=2)
 
     for country in countries:
-        c_ok, c_tags = gpx_rules.test_country(track, country['id'], gpx_utils.get_name(country))
+        c_ok, c_tags = gpx_rules.test_country(track, country['id'], gpx_utils.get_name(country['tags']))
         if c_ok:
-            __LOG.info("Track intersects with " + gpx_utils.get_name(country))
+            __LOG.info("Track intersects with " + gpx_utils.get_name(country['tags']))
             tags.extend(c_tags)
 
     tags.sort()

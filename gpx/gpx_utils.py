@@ -116,20 +116,20 @@ def test_object(track, obj):
     return False
 
 
-def get_name(data):
+def get_name(tags):
     """
-    :param dict data: relation data
+    :param dict tags: tags for the relation
     :return unicode: relation name
     """
     rel_name = None
     try:
-        rel_name = data['tags']['name:en']
+        rel_name = tags['name:en']
     except KeyError:
         # Some does not have separate english and native name.
         pass
 
     if rel_name is None or rel_name is '':
-        rel_name = data['tags']['name']
+        rel_name = tags['name']
 
     return enforce_unicode(rel_name)
 
