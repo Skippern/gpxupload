@@ -109,7 +109,7 @@ class LinearResolver(GpxResolver):
 
         relations = gpx_data.load_relations(obj_id, obj_level, next_level)
         for rel in relations:
-            rel_id = rel['id']
+            rel_id = int(rel['id'])
             rel_level = int(rel['tags']['admin_level'])
             rel_name = gpx_utils.get_name(rel['tags'])
 
@@ -235,7 +235,7 @@ class TreeResolver(GpxResolver):
                 elif criteria_level > region_level:
                     relations = gpx_data.load_relations(region_id, region_level, criteria_level)
                     for rel in relations:
-                        rel_id = rel['id']
+                        rel_id = int(rel['id'])
                         rel_level = int(rel['tags']['admin_level'])
                         rel_name = gpx_utils.get_name(rel['tags'])
 
