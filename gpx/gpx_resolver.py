@@ -236,11 +236,11 @@ class TreeResolver(GpxResolver):
                     relations = gpx_data.load_relations(region_id, region_level, criteria_level)
                     for rel in relations:
                         rel_id = rel['id']
-                        rel_level = rel['tags']['admin_level']
+                        rel_level = int(rel['tags']['admin_level'])
                         rel_name = gpx_utils.get_name(rel['tags'])
 
                         if rel_level is not criteria_level:
-                            continue
+                            raise AssertionError(u'Relation level is not same as checked criteria %s != %s' % (rel_level, criteria_level))
 
                         rel_ok, rel_tags = self.__test_tree_recursive(
                                 track, rel_id, rel_level, tree[criteria_level], rel_name)
