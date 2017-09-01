@@ -30,7 +30,7 @@ def init_cache():
                 pass
 
 
-def clear_cache(types = None):
+def clear_cache(types=None):
     if types is None:
         types = ['geos', 'tags', 'rels']
     init_cache()
@@ -95,7 +95,7 @@ def load_wkb(obj_id, admin_level, name=None):
 
     :param int obj_id: The object ID to load.
     :param int admin_level: The subdir to load from (usually the administrative level).
-    :param str name: The name of the object if known.
+    :param str|unicode name: The name of the object if known.
     :return: The loaded shape.
     """
     filename = '%s/geos/%s/%s.wkb' % (cache_dir, admin_level, obj_id)
@@ -126,7 +126,8 @@ def load_wkb(obj_id, admin_level, name=None):
             print u'ObjectSizeError!!!'
             print u'%s/%s (%s) have no size.' % (admin_level, obj_id, name)
             print
-            sys.exit(126)
+            # sys.exit(126)
+            return None
         return obj
     except IOError:
         # no such file, that is OK.
@@ -162,7 +163,7 @@ def load_rels(obj_id, obj_level, admin_level):
         with open(filename, 'r') as in_file:
             return json.loads(in_file.read())
     except IOError:
-        # no such file.
+        # no such file, which is fine.
         return None
 
 
@@ -180,7 +181,7 @@ def load_tags(obj_id, admin_level):
         with open(filename, 'r') as in_file:
             return json.loads(in_file.read())
     except IOError:
-        # no such file.
+        # no such file, which is fine.
         return None
 
 
@@ -205,27 +206,25 @@ def store_kml(obj, obj_id, admin_level, name=u'unknown'):
     ascii_name = gpx_utils.enforce_unicode(name).encode('ascii', 'replace')
     filename = './%s_%s.kml' % (ascii_name.replace(' ', '_'), obj_id)
     __LOG.info(u'store_kml: storing a %s with size: %s ', obj.geom_type, obj.area)
-    try:
-        ns = '{http://www.opengis.net/kml/2.2}'
-        sls = styles.LineStyle(color='ffff0000')
-        sas = styles.PolyStyle(color='5500ff00')
-        sps = styles.BalloonStyle(bgColor='ff0000ff')
-        style = styles.Style(styles=[sls, sas, sps])
-        kf = kml.KML(ns)
-        if obj.geom_type == 'LineString' or obj.geom_type == 'MultiLineString' or obj.geom_type == 'LinearRing':
-            d = kml.Document(ns, str(obj_id), 'Traces', 'GPX Visualization')
-        elif obj.geom_type == 'Polygon' or obj.geom_type == 'MultiPolygon':
-            d = kml.Document(ns, str(obj_id), 'Border of {0} ({1})'.format(ascii_name, obj_id), 'Border visualization')
-        else:
-            d = kml.Document(ns, str(obj_id), 'Points', 'Point visualization')
-        kf.append(d)
-        p = kml.Placemark(ns, str(obj_id), ascii_name, '{0}'.format(ascii_name), styles=[style])
-        p.geometry = obj
-        d.append(p)
-        fil = open(filename, 'w')
-        fil.write(kf.to_string(prettyprint=True))
-        fil.flush()
-        fil.close()
-        __LOG.debug(u'store_kml: store successful (%s/%s) -> %s' % (admin_level, obj_id, filename))
-    except Exception as e:
-        __LOG.error(u'store_kml: Failed to create KML %s: %s' % (filename, e.message))
+
+    ns = '{http://www.opengis.net/kml/2.2}'
+    sls = styles.LineStyle(color='ffff0000')
+    sas = styles.PolyStyle(color='5500ff00')
+    sps = styles.BalloonStyle(bgColor='ff0000ff')
+    style = styles.Style(styles=[sls, sas, sps])
+    kf = kml.KML(ns)
+    if obj.geom_type == 'LineString' or obj.geom_type == 'MultiLineString' or obj.geom_type == 'LinearRing':
+        d = kml.Document(ns, str(obj_id), 'Traces', 'GPX Visualization')
+    elif obj.geom_type == 'Polygon' or obj.geom_type == 'MultiPolygon':
+        d = kml.Document(ns, str(obj_id), 'Border of {0} ({1})'.format(ascii_name, obj_id), 'Border visualization')
+    else:
+        d = kml.Document(ns, str(obj_id), 'Points', 'Point visualization')
+    kf.append(d)
+    p = kml.Placemark(ns, str(obj_id), ascii_name, '{0}'.format(ascii_name), styles=[style])
+    p.geometry = obj
+    d.append(p)
+    fil = open(filename, 'w')
+    fil.write(kf.to_string(prettyprint=True))
+    fil.flush()
+    fil.close()
+    __LOG.debug(u'store_kml: store successful (%s/%s) -> %s' % (admin_level, obj_id, filename))

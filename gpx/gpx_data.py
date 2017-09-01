@@ -82,6 +82,10 @@ def geojson_to_geometry(data):
         shape = Polygon(shape.exterior).buffer(__1MD)
     else:
         raise Exception("Unknown polygon type: %s" % shape.type)
+
+    if shape.area == 0.0:
+        raise AssertionError(u'Created shape with area 0')
+
     return shape
 
 
@@ -94,7 +98,7 @@ def load_geo_shape(obj_id, admin_level, name):
     :param unicode name: The name of the object (mostly for debugging).
     :return: The loaded geometrical shape
     """
-    obj = gpx_store.load_wkb(obj_id, admin_level)
+    obj = gpx_store.load_wkb(obj_id, admin_level, name)
     if obj is not None:
         return obj
 
