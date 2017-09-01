@@ -111,7 +111,7 @@ class LinearResolver(GpxResolver):
         for rel in relations:
             rel_id = rel['id']
             rel_level = int(rel['tags']['admin_level'])
-            rel_name = gpx_utils.get_name(rel)
+            rel_name = gpx_utils.get_name(rel['tags'])
 
             if rel_level is not next_level:
                 raise AssertionError(u"Relation level mismatch: %s != %s for %s" % (rel_level, next_level, rel_name))
@@ -236,12 +236,10 @@ class TreeResolver(GpxResolver):
                 elif criteria_level > region_level:
                     relations = gpx_data.load_relations(region_id, region_level, criteria_level)
                     for rel in relations:
-                        try:
-                            rel_id = rel['id']
-                            rel_level = rel['tags']['admin_level']
-                            rel_name = gpx_utils.get_name(rel)
-                        except KeyError:
-                            continue
+                        rel_id = rel['id']
+                        rel_level = rel['tags']['admin_level']
+                        rel_name = gpx_utils.get_name(rel['tags'])
+
                         if rel_level is not criteria_level:
                             continue
 
@@ -271,7 +269,7 @@ class TreeResolver(GpxResolver):
         if gpx_utils.test_object(track, region):
             c_tags = gpx_data.load_tags(obj_id, obj_level)
             tags.extend(gpx_utils.get_tags(c_tags))
-            rel_name = gpx_utils.get_name(region)
+            rel_name = gpx_utils.get_name(c_tags)
             # Do the actual test for the region.
             accepted, rel_tags = self.__test_recursive(track, region, tree, rel_name)
             if accepted:
