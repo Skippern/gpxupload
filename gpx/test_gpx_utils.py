@@ -16,7 +16,11 @@ def test_get_name():
             'name:no': u'Navnet'
         }
     }) == u'El Nomo', 'Wrong name from local-name'
-    assert gpx_utils.get_name({
-        'id': 1234,
-        'tags': {}
-    }) == u'1234', 'Wrong name from ID'
+    try:
+        gpx_utils.get_name({
+            'id': 1234,
+            'tags': {}
+        })
+        assert False, 'No exception'
+    except KeyError as e:
+        assert e.message == 'name', 'Key "name" was not the failure.'
