@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+import json
 
 import requests
 
@@ -36,19 +37,15 @@ def upload_gpx(gpx_file, tags, description):
         sys.exit(99)
     send_tags = gpx_utils.enforce_unicode(tags.replace('.', '_'))
 
+    payload = {u'description': description, u'tags': send_tags, u'visibility': __TRACK_VISIBILITY}
+    payload = json.loads(json.dumps(payload))
     try:
         url = 'http://www.openstreetmap.org/api/0.6/gpx/create'
-
-        # truly not what it says it is, but to enforce correct multi-part form data.
-        files = (
-            ('file', open(gpx_file, 'rb').read()),
-            ('description', description),
-            ('tags', send_tags),
-            ('visibility', __TRACK_VISIBILITY))
+        files = {u'file': open(gpx_file, 'rb')}
         r = None
         for i in range(1, __UPLOAD_MAX_TRIES + 1):
             try:
-                r = requests.post(url, auth=(user_name, password), files=files)
+                r = requests.post(url, auth=(user_name, password), files=files, data=payload)
                 break
             except requests.exceptions.ReadTimeout:
                 pass
