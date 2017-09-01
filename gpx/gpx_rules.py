@@ -40,7 +40,10 @@ __NAME_RULES = dict({
     ##############################
     u'Anguilla': Rule('country'),
     u'Antigua and Barbuda': Rule('country'),
-    u'Argentina': Rule('linear', levels=[4, 5, 6, 7]),
+    u'Argentina': Rule('tree', tree={4: {
+                       u'Autonomous City of Buenos Aires': True,
+                       5: {5: True, 6: True, 7: True, 8: True},
+                       }}),
     u'Barbados': Rule('linear', levels=[6], accept=2),
     u'Belize': Rule('linear', levels=[4]),
     u'Bermuda': Rule('linear', levels=[6]),
