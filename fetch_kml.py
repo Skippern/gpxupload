@@ -25,13 +25,19 @@ if 'cache_dir' in args:
 gpx_store.init_cache()
 
 
-tags = gpx_data.load_tags(args.obj_id, args.obj_level)
+try:
+    tags = gpx_data.load_tags(args.obj_id, args.obj_level)
+except:
+    tags = dict({ 'name': 'unknown', })
 
 name = str(args.obj_id)
 if 'name:en' in tags:
     name = tags['name:en']
 else:
-    name = tags['name']
+    try:
+        name = tags['name']
+    except:
+        pass
 
 geos = gpx_data.load_geo_shape(args.obj_id, args.obj_level, name)
 gpx_store.store_kml(geos, args.obj_id, args.obj_level, name)

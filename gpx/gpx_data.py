@@ -36,6 +36,10 @@ def geojson_to_geometry(data, name):
 
     ###########################
 
+    if len(my_ways) == 0:
+        __LOG.critical("Relation have no shape: %s" % name )
+        return None
+
     rings = []
     lines = []
 
