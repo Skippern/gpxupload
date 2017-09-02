@@ -136,7 +136,7 @@ def get_relations_in_bbox(min_lat, min_long, max_lat, max_long, level=2):
         '["type"="boundary"]' +
         '["boundary"="administrative"];' +
         'convert rel_info' +
-        '  ::id = id() - 3600000000,' +
+        '  ::id = id(),' +
         '  "name" = t["name"],' +
         '  "name:en" = t["name:en"],' +
         '  "admin_level" = t["admin_level"];' +
