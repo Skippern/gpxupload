@@ -109,6 +109,8 @@ def test_object(track, obj):
     :param obj: The polygon object to test against.
     :return bool: If the object
     """
+    if obj == None:
+        return False
     if track.within(obj):
         return True
     if track.intersects(obj):

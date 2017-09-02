@@ -148,6 +148,9 @@ def store_wkb(obj, obj_id, admin_level):
     :param int admin_level: The subdir (usually the administrative level)
     :return: None
     """
+    if obj == None:
+        return None
+    
     filename = '%s/geos/%s/%s.wkb' % (cache_dir, admin_level, obj_id)
 
     __LOG.info(u'store_wkb: storing a %s with size: %s ', obj.geom_type, obj.area)
