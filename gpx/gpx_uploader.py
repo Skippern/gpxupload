@@ -22,20 +22,20 @@ def upload_gpx(gpx_file, tags, description):
     :return:
     """
     user_name = os.environ.get('OSM_USER')
-    if user_name is None:
+    if user_name is None or user_name is '':
         user_name = os.environ.get('MAPILLARY_EMAIL')
-    if user_name is None:
+    if user_name is None or user_name is '':
         __LOG.critical(u'NO USERNAME SET FOR UPLOAD')
         print u'For upload to work, you need to set the environmental variables OSM_USER and OSM_PASSWORD'
         sys.exit(99)
     password = os.environ.get('OSM_PASSWORD')
-    if password is None:
+    if password is None or password is '':
         password = os.environ.get('MAPILLARY_PASSWORD')
-    if password is None:
+    if password is None or password is '':
         __LOG.critical(u'NO PASSWORD SET FOR UPLOAD')
         print u'For upload to work, you need to set the environmental variables OSM_USER and OSM_PASSWORD'
         sys.exit(99)
-    send_tags = gpx_utils.enforce_unicode(tags.replace('.', '_'))
+    send_tags = gpx_utils.enforce_unicode(tags.replace('.', '_').replace(';', "_"))
 
     payload = {u'description': description, u'tags': send_tags, u'visibility': __TRACK_VISIBILITY}
     payload = json.loads(json.dumps(payload))
