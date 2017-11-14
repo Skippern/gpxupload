@@ -12,17 +12,12 @@ import gpx_utils
 
 __LOG = logging.getLogger("gpx_loader")
 
-# __SERVERS = []
-# __SERVERS.append('http://overpass-api.de/api/interpreter')
-# __SERVERS.append('http://overpass.osm.rambler.ru/cgi/interpreter')
-# __SERVERS.append('http://api.openstreetmap.fr/oapi/interpreter')
-# __SERVERS.append('http://overpass.osm.ch/api/interpreter')
+config = gpx_utils.load_config()
 
-# -- Server also runs several other services so only for light usage
-# __SERVERS.append('http://overpass.openstreetmap.ie/api/')
-
-# __SERVER = random.choice(__SERVERS)
-overpass_server = 'http://overpass-api.de/api/interpreter'
+try:
+    overpass_server = config['overpass_server']
+except:
+    overpass_server = 'http://overpass-api.de/api/interpreter'
 
 # Delay between each retry on 'normal' failures.
 __OVERPASS_RETRY_DELAY = 10

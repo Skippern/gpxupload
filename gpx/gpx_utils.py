@@ -8,10 +8,15 @@ import chardet
 import yaml
 from shapely.geometry import Point, MultiPoint
 
+config = load_config()
+
 __LOG = logging.getLogger('gpx_utils')
 __CODECS = ['ascii', 'iso-8859-2', 'iso-8859-1', 'iso-8859-3', 'iso-8859-4', 'iso-8859-5', 'iso-8859-6', 'iso-8859-7', 'iso-8859-8', 'iso-8859-9', 'iso-8859-10', 'iso-8859-11', 'iso-8859-12', 'iso-8859-13', 'iso-8859-14', 'iso-8859-15', 'iso-8859-16', 'mac-latin2', 'big5', 'cp037', 'cp1006', 'cp1026', 'cp1140', 'cp1250', 'cp1251', 'cp1252', 'cp1253', 'cp1254', 'cp1255', 'cp1256', 'cp1257', 'cp1258', 'cp424', 'cp437', 'cp500', 'cp720', 'cp737', 'cp755', 'cp850', 'cp852', 'cp855', 'cp856', 'cp857', 'cp858', 'cp860', 'cp861', 'cp862', 'cp863', 'cp864', 'cp865', 'cp866', 'cp869', 'cp874', 'cp875', 'cp932', 'cp949', 'cp950', 'euc_jis-2004', 'gb18030', 'gb2312', 'gbk', 'hp-roman8', 'mac_arabic', 'mac_centeuro', 'mac_croatian', 'mac_cyrillic', 'mac_farsi', 'mac_greek', 'mac_iceland', 'mac_roman', 'mac_romanian', 'mac_turkish', 'palmos', 'ptcp154', 'tis_620', 'mbcs', 'utf-8']
 __DEBUGGING = False
-__NAME_LANGUAGES = ['en', 'no', 'pt']
+try:
+    __NAME_LANGUAGES = config['languages']
+except:
+    __NAME_LANGUAGES = ['en', 'no', 'pt']
 
 
 class BBox(object):
@@ -51,15 +56,15 @@ def enforce_unicode(s):
         codec = encoding['encoding']
         try:
             s = s.encode(codec).decode('utf8')
-            __LOG.debug(u'clean(i) Text identified as %s', codec)
+            __LOG.debug(u'enforce_unicode(i) Text identified as %s', codec)
         except Exception as e:
-            __LOG.debug(u'clean(i) failed to detect codec: %s' % e.message)
+            __LOG.debug(u'enforce_unicode(i) failed to detect codec: %s' % e.message)
     except:
         pass
-    __LOG.debug(u'clean(i) codec is %s', codec)
+    __LOG.debug(u'enforce_unicode(i) codec is %s', codec)
     if isinstance(s, unicode):
         return s
-    __LOG.debug(u'Need to run down codecList in clean(i)')
+    __LOG.debug(u'Need to run down codecList in enforce_unicode(i)')
     for codec in __CODECS:
         try:
             s = s.encode(codec).decode('utf8')
@@ -91,8 +96,8 @@ def swap(a, b):
 
 def remove_duplicates(values):
     """
-    :param [] values:
-    :return []: The
+    :param [] values: list of values
+    :return []: The same list without duplicated values
     """
     output = []
     seen = set()
@@ -107,7 +112,7 @@ def test_object(track, obj):
     """
     :param track: The track to test.
     :param obj: The polygon object to test against.
-    :return bool: If the object
+    :return bool: If the track is within or interesects the object
     """
     if obj == None:
         return False
@@ -223,12 +228,21 @@ def get_tags(tags):
 
     return out
 
+def store_config(obj)
+    config_file = '%s/.gpx_upload.yaml' % os.environ['HOME']
+    try:
+        with open(config_file, 'w') as f:
+            f.write(yaml.dump(obj, Dumper=yaml.Dumper))
+    except IOError:
+        pass
 
 def load_config():
     obj = {
         'cache_dir': '%s/.cache/gpx' % os.environ['HOME'],
         'enable_upload': True,
         'overpass_server': 'http://overpass-api.de/api/interpreter',
+        'track_visibility': 'public',
+        'languages': [ 'en' ],
     }
     config_file = '%s/.gpx_upload.yaml' % os.environ['HOME']
     try:

@@ -8,10 +8,15 @@ import requests
 
 import gpx_utils
 
+config = gpx_utils.load_config()
+
 __LOG = logging.getLogger('gpx_uploader')
 __UPLOAD_FAILURE_DELAY = 60
 __UPLOAD_MAX_TRIES = 10
-__TRACK_VISIBILITY = u'public'  # public, private, trackable, identifiable
+try:
+    __TRACK_VISIBILITY = gpx_utils.enforce_unicode(config['track_visibility'])
+except:
+    __TRACK_VISIBILITY = u'public'  # public, private, trackable, identifiable
 
 
 def upload_gpx(gpx_file, tags, description):
