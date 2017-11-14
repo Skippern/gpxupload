@@ -228,7 +228,7 @@ def get_tags(tags):
 
     return out
 
-def store_config(obj)
+def store_config(obj):
     config_file = '%s/.gpx_upload.yaml' % os.environ['HOME']
     try:
         with open(config_file, 'w') as f:
