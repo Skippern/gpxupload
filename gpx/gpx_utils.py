@@ -241,8 +241,8 @@ def load_config():
         'cache_dir': '%s/.cache/gpx' % os.environ['HOME'],
         'enable_upload': True,
         'overpass_server': 'http://overpass-api.de/api/interpreter',
-        'track_visibility': 'public',
-#        'languages': { 'en', },
+        'languages': { 'en', },
+        'track_visibility': 'public'
     }
     config_file = '%s/.gpx_upload.yaml' % os.environ['HOME']
     try:
