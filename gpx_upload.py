@@ -20,6 +20,7 @@ from gpx import gpx_config
 config = gpx_config.load_config()
 
 parser = argparse.ArgumentParser(description='Load and create a KML file')
+parser.add_argument('--set', metavar='CONFIG', type=str, default=argparse.SUPPRESS, help='sets a config variable')
 parser.add_argument('--cache_dir', metavar='DIR', type=str,
                     help='Location of cache', default=argparse.SUPPRESS)
 parser.add_argument('--log_file', metavar='FILE', type=str,
@@ -29,6 +30,9 @@ parser.add_argument('--dry_run', action='store_true',
 parser.add_argument('input_file', type=str, help='relation ID of object')
 
 args = parser.parse_args()
+
+if 'set' in args:
+    gpx_config.modify_config(args)
 
 if 'cache_dir' in args:
     gpx_store.cache_dir = args.cache_dir
