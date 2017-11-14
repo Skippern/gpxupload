@@ -7,8 +7,9 @@ import json
 import requests
 
 import gpx_utils
+import gpx_config
 
-config = gpx_utils.load_config()
+config = gpx_config.load_config()
 
 __LOG = logging.getLogger('gpx_uploader')
 __UPLOAD_FAILURE_DELAY = 60

@@ -15,8 +15,9 @@ from gpx import gpx_rules
 from gpx import gpx_store
 from gpx import gpx_uploader
 from gpx import gpx_utils
+from gpx import gpx_config
 
-config = gpx_utils.load_config()
+config = gpx_config.load_config()
 
 parser = argparse.ArgumentParser(description='Load and create a KML file')
 parser.add_argument('--cache_dir', metavar='DIR', type=str,

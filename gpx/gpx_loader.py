@@ -9,10 +9,11 @@ import overpass
 import requests
 
 import gpx_utils
+import gpx_config
+
+config = gpx_config.load_config()
 
 __LOG = logging.getLogger("gpx_loader")
-
-config = gpx_utils.load_config()
 
 try:
     overpass_server = config['overpass_server']
