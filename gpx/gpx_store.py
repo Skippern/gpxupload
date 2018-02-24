@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import time
 from xml.etree import ElementTree
 
 from fastkml import kml, styles
@@ -103,6 +104,8 @@ def load_wkb(obj_id, admin_level, name=None):
     __LOG.debug(u'load_wkb: storing (%s/%s) -> %s' % (admin_level, obj_id, filename))
     try:
         with open(filename) as in_file:
+            if ((time.time() - os.path.getmtime(filename)) > 2592000.0): # 30 days
+                return None
             obj = wkb.loads(in_file.read())
         __LOG.info(u'load_wkb: loaded a %s with size: %s', obj.geom_type, obj.area)
         if obj.geom_type is 'Polygon' or obj.geom_type is 'MultiPolygon':
@@ -164,6 +167,8 @@ def load_rels(obj_id, obj_level, admin_level):
     filename = '%s/rels/%s/%s_%s.json' % (cache_dir, obj_level, obj_id, admin_level)
     try:
         with open(filename, 'r') as in_file:
+            if ((time.time() - os.path.getmtime(filename)) > 86400.0): # 24 hrs
+                return None
             return json.loads(in_file.read())
     except IOError:
         # no such file, which is fine.
@@ -182,6 +187,8 @@ def load_tags(obj_id, admin_level):
     filename = '%s/tags/%s/%s.json' % (cache_dir, admin_level, obj_id)
     try:
         with open(filename, 'r') as in_file:
+            if ((time.time() - os.path.getmtime(filename)) > 86400.0): # 24 hrs
+                return None
             return json.loads(in_file.read())
     except IOError:
         # no such file, which is fine.
