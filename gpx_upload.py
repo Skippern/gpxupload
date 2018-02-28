@@ -69,7 +69,10 @@ track_pt_length = 0
 trackLength = 0.0
 
 for track in tracks:
-    track_pt_length = track_pt_length + len(track)
+    try:
+        track_pt_length = track_pt_length + len(track)
+    except:
+        pass # Adding 0 length -> Point has no length
 
     if track.geom_type == "Point":
         pass
