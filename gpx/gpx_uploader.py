@@ -40,7 +40,7 @@ def upload_gpx(gpx_file, tags, description):
     payload = {u'description': description, u'tags': send_tags, u'visibility': __TRACK_VISIBILITY}
     payload = json.loads(json.dumps(payload))
     try:
-        url = 'http://www.openstreetmap.org/api/0.6/gpx/create'
+        url = 'https://www.openstreetmap.org/api/0.6/gpx/create'
         files = {u'file': open(gpx_file, 'rb')}
         r = None
         for i in range(1, __UPLOAD_MAX_TRIES + 1):
